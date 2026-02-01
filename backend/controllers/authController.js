@@ -1,0 +1,490 @@
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const validateuser = require('../utils/validators');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
+const JWT_EXPIRY = 60 * 60 * 24 * 7; // ~16 days
+
+// Cookie options
+const getCookieOptions = () => ({
+    maxAge: JWT_EXPIRY * 1000,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    path: '/'
+});
+
+// @desc    Register new user
+// @route   POST /api/auth/register
+const registerUser = async (req, res) => {
+    try {
+        validateuser(req.body);
+
+        const { name, email, password } = req.body;
+
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({
+                message: "Email is already registered, try with different email"
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = await User.create({
+            name,
+            email,
+            password: hashedPassword,
+            role: 'User',
+            loginProvider: 'local'
+        });
+
+        const token = jwt.sign(
+            { userId: user._id, email: email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRY }
+        );
+
+        res.cookie('token', token, getCookieOptions());
+
+        res.status(200).json({
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            },
+            message: "Registration successful"
+        });
+
+    } catch (error) {
+        console.error('Error in registerUser:', error);
+        res.status(500).json({ message: error.message || 'Internal server error' });
+    }
+};
+
+// @desc    Login user
+// @route   POST /api/auth/login
+const loginUser = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                error: "Email and password are required",
+                field: !email ? "email" : "password"
+            });
+        }
+
+        // IMPORTANT: Must select('+password') because password has select: false in schema
+        const user = await User.findOne({ email }).select('+password');
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: "No account found with this email",
+                field: "email"
+            });
+        }
+
+        // Check if user logged in with social provider (not local/email)
+        // const isLocalProvider = user.loginProvider !== 'local' || user.loginProvider === 'email';
+        if (!user.password) {
+            return res.status(401).json({
+                success: false,
+                error: "This account uses Google login. Please use Google to sign in.",
+                field: "password"
+            });
+        }
+
+        const match = await bcrypt.compare(password, user.password);
+
+        if (!match) {
+            return res.status(401).json({
+                success: false,
+                error: "Incorrect password",
+                field: "password"
+            });
+        }
+
+        const token = jwt.sign(
+            { userId: user._id, email: email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRY }
+        );
+
+        res.cookie('token', token, getCookieOptions());
+
+        res.status(200).json({
+            success: true,
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                avatar: user.avatar || '',
+                createdAt: user.createdAt
+            },
+            message: "Login successful"
+        });
+
+    } catch (error) {
+        console.error('Error in loginUser:', error);
+        res.status(500).json({
+            success: false,
+            error: "An unexpected error occurred during login"
+        });
+    }
+};
+
+// @desc    Social/Google login
+// @route   POST /api/auth/google
+const socialLogin = async (req, res) => {
+    try {
+        const { email, name, auth0Id, avatar, email_verified } = req.body;
+
+        if (!email || !auth0Id) {
+            return res.status(400).json({ message: "Invalid social login data" });
+        }
+
+        let user = await User.findOne({
+            $or: [{ auth0Id }, { email }]
+        });
+
+        if (user) {
+            if (!user.auth0Id) {
+                user.auth0Id = auth0Id;
+                user.loginProvider = auth0Id.startsWith('google') ? 'google' : 'github';
+                if (!user.avatar && avatar) user.avatar = avatar;
+                await user.save();
+            }
+        } else {
+            user = await User.create({
+                name,
+                email,
+                auth0Id,
+                avatar,
+                loginProvider: auth0Id.startsWith('google') ? 'google' : 'github',
+                role: 'User',
+                password: await bcrypt.hash(Math.random().toString(36), 10),
+                emailVerified: email_verified
+            });
+        }
+
+        const token = jwt.sign(
+            { userId: user._id, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRY }
+        );
+
+        res.cookie('token', token, getCookieOptions());
+
+        res.status(200).json({
+            success: true,
+            message: "Social login successful",
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                avatar: user.avatar
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in socialLogin:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+// @desc    Logout user
+// @route   POST /api/auth/logout
+const logoutUser = async (req, res) => {
+    try {
+        res.cookie('token', null, { expires: new Date(Date.now()), path: '/' });
+
+        res.status(200).json({
+            success: true,
+            message: "Logout successful"
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: "Error: " + err.message
+        });
+    }
+};
+
+// @desc    Check session / Get current user
+// @route   GET /api/auth/check-session
+const checkSession = async (req, res) => {
+    try {
+        const user = req.finduser;
+        const token = req.cookies.token;
+
+        if (!user) {
+            return res.status(401).json({ message: "Not logged in" });
+        }
+
+        res.status(200).json({
+            message: "Valid user",
+            user,
+            token
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+// @desc    Get all users (Admin/Co-Admin only)
+// @route   GET /api/auth/users
+const allUsers = async (req, res) => {
+    try {
+        const role = req.finduser.role;
+
+        if (role !== 'co-admin' && role !== 'admin') {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to view all users"
+            });
+        }
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        // Filter options
+        const filter = {};
+        if (req.query.role) filter.role = req.query.role;
+        if (req.query.search) {
+            filter.$or = [
+                { name: new RegExp(req.query.search, 'i') },
+                { email: new RegExp(req.query.search, 'i') }
+            ];
+        }
+
+        const totalUsers = await User.countDocuments(filter);
+        const users = await User.find(filter)
+            .select('-password')
+            .populate('studentDetails.currentSubscription.libraryId', 'libraryName')
+            .populate('studentDetails.assignedSeat.seatId', 'seatNumber category')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        res.status(200).json({
+            message: "Users retrieved successfully",
+            users,
+            pagination: {
+                total: totalUsers,
+                totalPages: Math.ceil(totalUsers / limit),
+                currentPage: page,
+                hasNextPage: page * limit < totalUsers,
+                hasPrevPage: page > 1
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+};
+
+// @desc    Update user (Admin/Co-Admin only)
+// @route   PUT /api/auth/users/:id
+const updateUser = async (req, res) => {
+    try {
+        const role = req.finduser.role;
+
+        if (role !== 'co-admin' && role !== 'admin') {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to update users"
+            });
+        }
+
+        const { id } = req.params;
+        const updateData = req.body;
+
+        // Only admin can change roles
+        if (updateData.role && req.finduser.role !== 'admin') {
+            return res.status(403).json({
+                message: 'Forbidden: Only admin can change user roles'
+            });
+        }
+
+        // Don't allow password update through this route
+        delete updateData.password;
+
+        // Flatten studentDetails to allow partial updates (preserve idCardImage etc)
+        if (updateData.studentDetails) {
+            const details = updateData.studentDetails;
+            delete updateData.studentDetails;
+
+            // Helper to flatten specifically for this known structure
+            if (details.currentSubscription) {
+                for (const [key, value] of Object.entries(details.currentSubscription)) {
+                    updateData[`studentDetails.currentSubscription.${key}`] = value;
+                }
+            }
+            if (details.assignedSeat) {
+                for (const [key, value] of Object.entries(details.assignedSeat)) {
+                    updateData[`studentDetails.assignedSeat.${key}`] = value;
+                }
+            }
+        }
+
+        const user = await User.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        )
+            .select('-password')
+            .populate('studentDetails.currentSubscription.libraryId', 'libraryName')
+            .populate('studentDetails.assignedSeat.seatId', 'seatNumber category');
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({
+            message: "User updated successfully",
+            user
+        });
+
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ message: "Error updating user", error: error.message });
+    }
+};
+
+// @desc    Delete user (Admin/Co-Admin only)
+// @route   DELETE /api/auth/users/:id
+const deleteUser = async (req, res) => {
+    try {
+        const role = req.finduser.role;
+
+        if (role !== 'co-admin' && role !== 'admin') {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to delete users"
+            });
+        }
+
+        const { id } = req.params;
+
+        // Prevent deleting yourself
+        if (id === req.finduser._id.toString()) {
+            return res.status(400).json({ message: "You cannot delete your own account" });
+        }
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Only admin can delete other admins
+        if (user.role === 'admin' && req.finduser.role !== 'admin') {
+            return res.status(403).json({ message: "Forbidden: Only admin can delete admin accounts" });
+        }
+
+        await User.findByIdAndDelete(id);
+
+        res.status(200).json({
+            message: "User deleted successfully",
+            deletedUser: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        });
+
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: "Error deleting user", error: error.message });
+    }
+};
+
+// @desc    Update own profile
+// @route   PUT /api/auth/profile
+const updateProfile = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const updateData = req.body;
+
+        // Fields that users can update themselves
+        const allowedFields = ['name', 'phone', 'avatar', 'addresses', 'preferences'];
+        const filteredData = {};
+
+        for (const key of allowedFields) {
+            if (updateData[key] !== undefined) {
+                filteredData[key] = updateData[key];
+            }
+        }
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $set: filteredData },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        res.status(200).json({
+            message: "Profile updated successfully",
+            user
+        });
+
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ message: "Error updating profile", error: error.message });
+    }
+};
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: "Current password and new password are required" });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: "New password must be at least 6 characters" });
+        }
+
+        const user = await User.findById(userId).select('+password');
+
+        if (!user.password) {
+            return res.status(400).json({ message: "This account uses social login. Password cannot be changed." });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: "Current password is incorrect" });
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        res.status(200).json({ message: "Password changed successfully" });
+
+    } catch (error) {
+        console.error('Error changing password:', error);
+        res.status(500).json({ message: "Error changing password", error: error.message });
+    }
+};
+
+module.exports = {
+    registerUser,
+    loginUser,
+    socialLogin,
+    logoutUser,
+    checkSession,
+    allUsers,
+    updateUser,
+    deleteUser,
+    updateProfile,
+    changePassword
+};
