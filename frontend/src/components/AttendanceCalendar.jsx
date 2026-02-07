@@ -2,13 +2,16 @@ import { useState, useEffect, useMemo } from 'react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { getAttendanceHistory } from '../api/entry';
-import { 
-    Loader2, CalendarDays, History, Clock, 
-    ChevronLeft, ChevronRight, MapPin, Coffee 
+import {
+    Loader2, CalendarDays, History, Clock,
+    ChevronLeft, ChevronRight, MapPin, Coffee
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { useTheme } from '../context/ThemeContext';
+
 const AttendanceCalendar = () => {
+    const { theme } = useTheme();
     const [attendanceMap, setAttendanceMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -23,7 +26,7 @@ const AttendanceCalendar = () => {
             if (data.success) {
                 const map = {};
                 data.history.forEach(record => {
-                    const dateKey = new Date(record.date).toDateString(); 
+                    const dateKey = new Date(record.date).toDateString();
                     map[dateKey] = record;
                 });
                 setAttendanceMap(map);
@@ -51,7 +54,7 @@ const AttendanceCalendar = () => {
         if (view === 'month') {
             const dateKey = date.toDateString();
             if (attendanceMap[dateKey]) {
-                return 'present-day'; 
+                return 'present-day';
             }
         }
         return null;
@@ -71,15 +74,15 @@ const AttendanceCalendar = () => {
             gap: 10px;
         }
         .react-calendar__navigation button {
-            color: white;
+            color: ${theme === 'dark' ? 'white' : '#111827'};
             min-width: 40px;
-            background: rgba(255,255,255,0.05) !important;
+            background: ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'} !important;
             border-radius: 12px;
             font-size: 14px;
             font-weight: 600;
         }
         .react-calendar__navigation button:enabled:hover {
-            background: rgba(255,255,255,0.1) !important;
+            background: ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} !important;
         }
         .react-calendar__month-view__weekdays {
             text-transform: uppercase;
@@ -99,19 +102,19 @@ const AttendanceCalendar = () => {
             align-items: center;
             justify-content: center;
             border-radius: 14px !important;
-            color: #d1d5db;
+            color: ${theme === 'dark' ? '#d1d5db' : '#374151'};
             font-size: 0.9rem;
             font-weight: 500;
             transition: all 0.2s ease;
             position: relative;
         }
         .react-calendar__tile:enabled:hover {
-            background-color: rgba(255,255,255, 0.08) !important;
+            background-color: ${theme === 'dark' ? 'rgba(255,255,255, 0.08)' : 'rgba(0,0,0, 0.05)'} !important;
         }
         .react-calendar__tile--now {
             background: transparent !important;
             border: 1px solid #a855f7 !important; /* Purple Border */
-            color: #d8b4fe !important;
+            color: #a855f7 !important;
         }
         .react-calendar__tile--active {
             background: #7e22ce !important; /* Purple-700 */
@@ -149,19 +152,19 @@ const AttendanceCalendar = () => {
 
             {/* --- Stats Overview --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <StatCard 
+                <StatCard
                     icon={<CalendarDays size={20} className="text-blue-400" />}
                     label="Days Present"
                     value={stats.days}
                     subtext="Total sessions"
                 />
-                <StatCard 
+                <StatCard
                     icon={<History size={20} className="text-purple-400" />}
                     label="Total Hours"
                     value={stats.hours}
                     subtext="Productive time"
                 />
-                <StatCard 
+                <StatCard
                     icon={<Clock size={20} className="text-emerald-400" />}
                     label="Daily Avg"
                     value={`${stats.average}h`}
@@ -171,15 +174,15 @@ const AttendanceCalendar = () => {
 
             {/* --- Main Interface --- */}
             <div className="flex flex-col lg:flex-row gap-6">
-                
+
                 {/* Left: Calendar Widget */}
                 <div className="lg:w-7/12">
-                    <div className="bg-[#0F0F12] border border-white/10 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-6 shadow-xl relative overflow-hidden transition-colors">
                         {/* Background Glow */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                        
+
                         <div className="relative z-10">
-                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                                 <CalendarDays size={18} className="text-gray-400" />
                                 Select Date
                             </h3>
@@ -199,11 +202,11 @@ const AttendanceCalendar = () => {
 
                 {/* Right: Timeline Details */}
                 <div className="lg:w-5/12 flex flex-col">
-                    <div className="bg-[#0F0F12] border border-white/10 rounded-3xl p-6 flex-1 shadow-xl relative h-full">
-                        
-                        <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
+                    <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-6 flex-1 shadow-xl relative h-full transition-colors">
+
+                        <div className="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-white/5 pb-4">
                             <div>
-                                <h3 className="text-lg font-bold text-white">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                                     {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </h3>
                                 <p className="text-xs text-gray-500 uppercase font-semibold">
@@ -212,7 +215,7 @@ const AttendanceCalendar = () => {
                             </div>
                             {selectedRecord && (
                                 <div className="text-right">
-                                    <span className="block text-2xl font-bold text-white">
+                                    <span className="block text-2xl font-bold text-gray-900 dark:text-white">
                                         {(selectedRecord.totalDurationToday / 60).toFixed(1)}
                                         <span className="text-sm text-gray-500 font-normal ml-1">hrs</span>
                                     </span>
@@ -236,15 +239,15 @@ const AttendanceCalendar = () => {
                                             <div key={idx} className="relative">
                                                 {/* Timeline Dot */}
                                                 <span className="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-purple-500 ring-4 ring-[#0F0F12]"></span>
-                                                
-                                                <div className="bg-white/5 rounded-2xl p-4 border border-white/5 hover:border-purple-500/30 transition-colors">
+
+                                                <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-4 border border-gray-100 dark:border-white/5 hover:border-purple-500/30 transition-colors">
                                                     <div className="flex justify-between items-start mb-2">
                                                         <div className="flex items-center gap-2">
-                                                            <div className="p-1.5 rounded-lg bg-green-500/10 text-green-400">
+                                                            <div className="p-1.5 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
                                                                 <Clock size={14} />
                                                             </div>
-                                                            <span className="text-white font-medium">
-                                                                {new Date(session.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                            <span className="text-gray-900 dark:text-white font-medium">
+                                                                {new Date(session.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                             </span>
                                                         </div>
                                                         <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded">
@@ -256,13 +259,13 @@ const AttendanceCalendar = () => {
 
                                                     <div className="flex justify-between items-end">
                                                         <div className="flex items-center gap-2">
-                                                            <div className="p-1.5 rounded-lg bg-red-500/10 text-red-400">
+                                                            <div className="p-1.5 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400">
                                                                 <LogOutIcon size={14} />
                                                             </div>
-                                                            <span className="text-white font-medium">
-                                                                {session.checkOutTime 
-                                                                    ? new Date(session.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-                                                                    : <span className="text-green-400 animate-pulse text-sm">Active Now</span>
+                                                            <span className="text-gray-900 dark:text-white font-medium">
+                                                                {session.checkOutTime
+                                                                    ? new Date(session.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                                    : <span className="text-green-600 dark:text-green-400 animate-pulse text-sm">Active Now</span>
                                                                 }
                                                             </span>
                                                         </div>
@@ -277,15 +280,15 @@ const AttendanceCalendar = () => {
 
                                 </motion.div>
                             ) : (
-                                <motion.div 
-                                    initial={{ opacity: 0 }} 
+                                <motion.div
+                                    initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     className="flex flex-col items-center justify-center h-48 text-center"
                                 >
-                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                                        <Coffee className="text-gray-600" size={24} />
+                                    <div className="w-16 h-16 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
+                                        <Coffee className="text-gray-400 dark:text-gray-600" size={24} />
                                     </div>
-                                    <p className="text-gray-300 font-medium">Rest Day</p>
+                                    <p className="text-gray-600 dark:text-gray-300 font-medium">Rest Day</p>
                                     <p className="text-sm text-gray-500 mt-1">No activity recorded for this date.</p>
                                 </motion.div>
                             )}
@@ -300,13 +303,13 @@ const AttendanceCalendar = () => {
 // --- Sub Components ---
 
 const StatCard = ({ icon, label, value, subtext }) => (
-    <div className="bg-[#0F0F12] border border-white/10 rounded-2xl p-5 flex items-center gap-4 hover:bg-white/5 transition-colors group">
-        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+    <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-2xl p-5 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group shadow-md dark:shadow-none">
+        <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
             {icon}
         </div>
         <div>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-0.5">{label}</p>
-            <p className="text-2xl font-bold text-white leading-none mb-1">{value}</p>
+            <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider mb-0.5">{label}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none mb-1">{value}</p>
             <p className="text-xs text-gray-500">{subtext}</p>
         </div>
     </div>

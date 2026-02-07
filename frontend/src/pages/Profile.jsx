@@ -4,14 +4,16 @@ import { updateProfile, changePassword } from '../api/users';
 import { useAuth } from '../context/AuthContext';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 import { 
-    User, Lock, Calendar, ArrowLeft, Camera, 
+    User, Lock, Calendar, ArrowLeft, Camera,LogOut, 
     Mail, Phone, Shield, Save, AlertCircle, CheckCircle2 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth0 } from '@auth0/auth0-react';
 
 const Profile = () => {
     const navigate = useNavigate();
-    const { user, login } = useAuth();
+    const { logout: auth0Logout } = useAuth0();
+    const { user, login, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
@@ -70,6 +72,12 @@ const Profile = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+        const handleLogout = () => {
+        logout();
+        auth0Logout({ logoutParams: { returnTo: window.location.origin + '/login' } });
+        navigate('/login');
     };
 
     // Animation Variants
@@ -148,6 +156,13 @@ const Profile = () => {
                                 icon={<Calendar size={18} />} 
                                 label="Attendance" 
                             /> */}
+                            <button
+                                onClick={handleLogout}
+                                className="p-2.5 rounded-full bg-white/5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                title="Logout"
+                            >
+                                <LogOut size={18} />
+                            </button>
                         </div>
                     </div>
 

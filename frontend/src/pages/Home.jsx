@@ -8,18 +8,19 @@ import UserSeatMap from '../components/UserSeatMap';
 import { getLibrarySeats } from '../api/seat';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { 
-    LogOut, MapPin, Armchair, Library, QrCode, 
-    LayoutDashboard, Users, PlusCircle, BookOpen,CalendarDays, 
-    ChevronRight, CreditCard, Clock 
+import {
+    LogOut, MapPin, Armchair, Library, QrCode,
+    LayoutDashboard, Users, PlusCircle, BookOpen, CalendarDays,
+    ChevronRight, CreditCard, Clock, Sun, Moon
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 
 // --- Animations ---
 const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
+    visible: {
         opacity: 1,
         transition: { staggerChildren: 0.1, delayChildren: 0.2 }
     }
@@ -27,14 +28,15 @@ const containerVariants = {
 
 const itemVariants = {
     hidden: { y: 20, opacity: 0 },
-    visible: { 
-        y: 0, 
+    visible: {
+        y: 0,
         opacity: 1,
         transition: { type: "spring", stiffness: 100 }
     }
 };
 
 const Home = () => {
+    const { theme, toggleTheme } = useTheme();
     const { user, logout, checkAuth } = useAuth();
     const { logout: auth0Logout } = useAuth0();
     const navigate = useNavigate();
@@ -87,7 +89,7 @@ const Home = () => {
         try {
             const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api';
             const response = await axios.post(`${API_URL}/entry/check-out`, {}, { withCredentials: true });
-            
+
             const { remainingTime, checkinsRemaining, maxDailyCheckins, msg } = response.data;
             const remainingTimeStr = remainingTime ? `${remainingTime.hours}h ${remainingTime.minutes}m` : '';
 
@@ -116,29 +118,29 @@ const Home = () => {
     const isAdmin = user?.role === 'admin' || user?.role === 'co-admin';
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white selection:bg-purple-500/30">
-            
+        <div className="min-h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white selection:bg-purple-500/30 transition-colors duration-300">
+
             {/* Ambient Background Glows */}
             <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-900/20 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-900/10 rounded-full blur-[120px]" />
+                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-200/40 dark:bg-purple-900/20 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/40 dark:bg-indigo-900/10 rounded-full blur-[120px]" />
             </div>
 
             {/* Navigation */}
-            <nav className="sticky top-0 z-40 backdrop-blur-xl bg-black/40 border-b border-white/5">
+            <nav className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 dark:bg-black/40 border-b border-gray-200 dark:border-white/5 transition-colors duration-300">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         {/* Logo */}
-                        <motion.div 
-                            initial={{ opacity: 0, x: -20 }} 
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center gap-3"
                         >
                             <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
                                 <Library className="text-white" size={20} />
                             </div>
-                            <span className="text-xl font-bold tracking-tight text-white">
-                                Library<span className="text-purple-400">Manager</span>
+                            <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Study<span className="text-purple-600 dark:text-purple-400">Space</span>
                             </span>
                         </motion.div>
 
@@ -147,11 +149,19 @@ const Home = () => {
                             <NavLink onClick={() => navigate('/libraries')} icon={<LayoutDashboard size={16} />} text="Libraries" />
                             {hasSubscription && <NavLink onClick={() => setShowAttendance(true)} icon={<CalendarDays size={16} />} text="History" />}
                             {isAdmin && <NavLink onClick={() => navigate('/users')} icon={<Users size={16} />} text="Users" />}
+
+                            {/* Theme Toggle */}
+                            <button
+                                onClick={toggleTheme}
+                                className="p-2 ml-2 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all"
+                            >
+                                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                            </button>
                         </div>
 
                         {/* Profile & Logout (Right Corner) */}
-                        <motion.div 
-                            initial={{ opacity: 0, x: 20 }} 
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             className="flex items-center gap-4"
                         >
@@ -166,7 +176,7 @@ const Home = () => {
                                         <span className="text-sm font-medium text-gray-200">Attendance</span>
                                     </button>
                                 )}
-                                
+
                                 <button
                                     onClick={() => navigate('/profile')}
                                     className="flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer group"
@@ -191,77 +201,77 @@ const Home = () => {
 
                             {/* Mobile Profile */}
                             <div className="md:hidden flex items-center gap-3">
+                                {/* Theme Toggle Mobile */}
+                                <button
+                                    onClick={toggleTheme}
+                                    className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all"
+                                >
+                                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                                </button>
+
                                 {hasSubscription && (
                                     <button
                                         onClick={() => setShowAttendance(true)}
-                                        className="p-2.5 rounded-full bg-white/5 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
+                                        className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all"
                                         title="Attendance"
                                     >
                                         <CalendarDays size={18} />
                                     </button>
                                 )}
-                                
-                                <button
-                                    onClick={handleLogout}
-                                    className="p-2.5 rounded-full bg-white/5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                    title="Logout"
-                                >
-                                    <LogOut size={18} />
-                                </button>
                             </div>
                         </motion.div>
 
-                        
+
                     </div>
                 </div>
             </nav>
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
-                <motion.div 
+                <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
                 >
                     {/* Header */}
                     <motion.div variants={itemVariants} className="mb-10">
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 tracking-tight">
-                            Welcome back, <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-300">{user?.name || 'User'}</span>
+                        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
+                            Welcome back, <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-500 dark:from-purple-400 dark:to-pink-300">{user?.name || 'User'}</span>
                         </h1>
-                        <p className="text-gray-400 text-lg">Here is what's happening in your library today.</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-lg">Here is what's happening in your library today.</p>
                     </motion.div>
 
                     {/* --- MASTER DASHBOARD GRID --- */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-                        
+
                         {/* 1. MAIN STATUS CARD (Spans 2 columns) */}
                         <motion.div variants={itemVariants} className="lg:col-span-2 relative group">
-                            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl blur opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
-                            <div className="relative h-full bg-[#0F0F12] border border-white/10 rounded-3xl p-8 flex flex-col justify-between overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-3xl blur opacity-10 dark:opacity-20 group-hover:opacity-20 dark:group-hover:opacity-30 transition-opacity duration-500"></div>
+                            <div className="relative h-full bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-8 flex flex-col justify-between overflow-hidden shadow-xl dark:shadow-none">
                                 {/* Decorative elements */}
                                 <div className="absolute top-0 right-0 p-32 bg-purple-500/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
 
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
                                     <div className="flex items-center gap-6">
-                                        <div className={`w-24 h-24 rounded-2xl flex items-center justify-center border-2 shadow-2xl ${activeSeat ? 'bg-gradient-to-br from-green-900/20 to-green-600/10 border-green-500/30' : 'bg-white/5 border-white/10'}`}>
+                                        <div className={`w-24 h-24 rounded-2xl flex items-center justify-center border-2 shadow-2xl ${activeSeat ? 'bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-600/10 border-green-500/30' : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10'}`}>
                                             {activeSeat ? (
                                                 <div className="text-center">
-                                                    <div className="text-xs text-green-400 uppercase font-bold tracking-wider mb-1">Seat</div>
-                                                    <div className="text-4xl font-bold text-white">{activeSeat.seatNumber}</div>
+                                                    <div className="text-xs text-green-600 dark:text-green-400 uppercase font-bold tracking-wider mb-1">Seat</div>
+                                                    <div className="text-4xl font-bold text-gray-900 dark:text-white">{activeSeat.seatNumber}</div>
                                                 </div>
                                             ) : (
-                                                <Armchair size={36} className="text-gray-600" />
+                                                <Armchair size={36} className="text-gray-400 dark:text-gray-600" />
                                             )}
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2 mb-2">
-                                                <div className={`w-2.5 h-2.5 rounded-full ${activeSeat ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse' : 'bg-gray-600'}`}></div>
-                                                <h2 className="text-2xl font-bold text-white tracking-tight">
+                                                <div className={`w-2.5 h-2.5 rounded-full ${activeSeat ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+                                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
                                                     {activeSeat ? "Session Active" : "No Active Session"}
                                                 </h2>
                                             </div>
-                                            <p className="text-gray-400 flex items-center gap-2">
-                                                <MapPin size={16} className="text-purple-400" />
+                                            <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                                <MapPin size={16} className="text-purple-600 dark:text-purple-400" />
                                                 {libraryName || "Select a library to begin"}
                                             </p>
                                         </div>
@@ -313,38 +323,38 @@ const Home = () => {
                         </motion.div>
 
                         {/* 2. SUBSCRIPTION INFO (Side Card) */}
-                        <motion.div variants={itemVariants} className="bg-[#0F0F12] border border-white/10 rounded-3xl p-6 flex flex-col">
-                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                                <CreditCard size={18} className="text-purple-400" />
+                        <motion.div variants={itemVariants} className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-6 flex flex-col shadow-xl dark:shadow-none">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                                <CreditCard size={18} className="text-purple-600 dark:text-purple-400" />
                                 Your Pass
                             </h3>
-                            
+
                             {subscription ? (
                                 <div className="flex-1 flex flex-col justify-between">
                                     <div className="space-y-4">
-                                        <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                                            <p className="text-sm text-gray-400 mb-1">Status</p>
-                                            <p className="text-green-400 font-bold flex items-center gap-2">
+                                        <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5">
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Status</p>
+                                            <p className="text-green-600 dark:text-green-400 font-bold flex items-center gap-2">
                                                 <span className="w-2 h-2 rounded-full bg-green-500"></span> Active
                                             </p>
                                         </div>
-                                        <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                                            <p className="text-sm text-gray-400 mb-1">Days Remaining</p>
-                                            <p className="text-2xl font-bold text-white">{daysLeft} Days</p>
-                                            <div className="w-full h-1 bg-gray-700 rounded-full mt-3 overflow-hidden">
+                                        <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5">
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Days Remaining</p>
+                                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{daysLeft} Days</p>
+                                            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-3 overflow-hidden">
                                                 <div className="h-full bg-purple-500 w-[70%]"></div>
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-4 text-center">Expires on {expiryDate?.toLocaleDateString()}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">Expires on {expiryDate?.toLocaleDateString()}</p>
                                 </div>
                             ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                                    <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4">
-                                        <Clock className="text-gray-500" size={24} />
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                                        <Clock className="text-gray-400 dark:text-gray-500" size={24} />
                                     </div>
-                                    <p className="text-gray-300 font-medium mb-4">No active subscription</p>
-                                    <button onClick={() => navigate('/libraries')} className="text-sm text-purple-400 hover:text-purple-300 font-semibold">
+                                    <p className="text-gray-600 dark:text-gray-300 font-medium mb-4">No active subscription</p>
+                                    <button onClick={() => navigate('/libraries')} className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold">
                                         Browse Plans &rarr;
                                     </button>
                                 </div>
@@ -356,21 +366,21 @@ const Home = () => {
                     {libraryId && (
                         <motion.div variants={itemVariants} className="mb-10">
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-2xl font-bold text-white">Live Floor Plan</h3>
-                                <div className="flex items-center gap-2 text-sm text-gray-400">
-                                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-600"></span> Occupied</span>
-                                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-white border border-gray-600"></span> Available</span>
+                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Live Floor Plan</h3>
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-400 dark:bg-gray-600"></span> Occupied</span>
+                                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-white border border-gray-300 dark:border-gray-600"></span> Available</span>
                                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-600"></span> Yours</span>
                                 </div>
                             </div>
-                            
-                            <div className="bg-[#0F0F12] border border-white/10 rounded-3xl p-1 overflow-hidden shadow-2xl shadow-black/50">
+
+                            <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-1 overflow-hidden shadow-xl dark:shadow-2xl dark:shadow-black/50">
                                 {loadingSeats ? (
                                     <div className="h-64 flex items-center justify-center text-gray-400 animate-pulse">
                                         Loading Layout...
                                     </div>
                                 ) : (
-                                    <div className="bg-[#1a1a20] rounded-[20px] overflow-hidden">
+                                    <div className="bg-gray-100 dark:bg-[#1a1a20] rounded-[20px] overflow-hidden">
                                         <UserSeatMap seats={seats} activeSeatId={activeSeat?.seatId} />
                                     </div>
                                 )}
@@ -380,18 +390,18 @@ const Home = () => {
 
                     {/* --- QUICK ACTIONS --- */}
                     <motion.div variants={itemVariants}>
-                        <h3 className="text-xl font-bold text-white mb-6">Quick Actions</h3>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Quick Actions</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <ActionCard 
-                                icon={<LayoutDashboard size={24} className="text-blue-400" />}
+                            <ActionCard
+                                icon={<LayoutDashboard size={24} className="text-blue-600 dark:text-blue-400" />}
                                 title="All Libraries"
                                 subtitle="View available spaces"
                                 onClick={() => navigate('/libraries')}
                             />
-                            
+
                             {isAdmin && (
-                                <ActionCard 
-                                    icon={<PlusCircle size={24} className="text-green-400" />}
+                                <ActionCard
+                                    icon={<PlusCircle size={24} className="text-green-600 dark:text-green-400" />}
                                     title="Add Library"
                                     subtitle="Register new branch"
                                     onClick={() => navigate('/add-library')}
@@ -399,8 +409,8 @@ const Home = () => {
                             )}
 
                             {user?.role === 'library_owner' && (
-                                <ActionCard 
-                                    icon={<BookOpen size={24} className="text-purple-400" />}
+                                <ActionCard
+                                    icon={<BookOpen size={24} className="text-purple-600 dark:text-purple-400" />}
                                     title="My Libraries"
                                     subtitle="Manage your branch"
                                     onClick={() => navigate('/my-libraries')}
@@ -408,18 +418,18 @@ const Home = () => {
                             )}
 
                             {isAdmin && (
-                                <ActionCard 
-                                    icon={<Users size={24} className="text-yellow-400" />}
+                                <ActionCard
+                                    icon={<Users size={24} className="text-yellow-600 dark:text-yellow-400" />}
                                     title="Manage Users"
                                     subtitle="Admin control panel"
                                     onClick={() => navigate('/users')}
                                 />
                             )}
-                            
+
                             {/* Generic fallback if no specific roles */}
                             {!isAdmin && user?.role !== 'library_owner' && (
-                                <ActionCard 
-                                    icon={<CreditCard size={24} className="text-pink-400" />}
+                                <ActionCard
+                                    icon={<CreditCard size={24} className="text-pink-600 dark:text-pink-400" />}
                                     title="History"
                                     subtitle="View past sessions"
                                     onClick={() => navigate('/history')}
@@ -498,9 +508,9 @@ const Home = () => {
 // --- Helper Components ---
 
 const NavLink = ({ icon, text, onClick }) => (
-    <button 
+    <button
         onClick={onClick}
-        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+        className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
     >
         {icon}
         <span className="font-medium text-sm">{text}</span>
@@ -512,16 +522,16 @@ const ActionCard = ({ icon, title, subtitle, onClick }) => (
         whileHover={{ y: -5, backgroundColor: "rgba(255,255,255,0.08)" }}
         whileTap={{ scale: 0.98 }}
         onClick={onClick}
-        className="bg-white/5 border border-white/10 p-6 rounded-2xl text-left transition-all group"
+        className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-6 rounded-2xl text-left transition-all group shadow-md dark:shadow-none hover:shadow-xl dark:hover:shadow-none hover:bg-gray-50 dark:hover:bg-white/10"
     >
-        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+        <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
             {icon}
         </div>
-        <h4 className="font-bold text-white mb-1 flex items-center justify-between">
+        <h4 className="font-bold text-gray-900 dark:text-white mb-1 flex items-center justify-between">
             {title}
-            <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-gray-400" />
+            <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-gray-400 dark:text-gray-500" />
         </h4>
-        <p className="text-xs text-gray-400">{subtitle}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
     </motion.button>
 );
 

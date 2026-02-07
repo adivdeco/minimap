@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import { ThemeProvider } from './context/ThemeContext';
 import Home from './pages/Home';
 import AddLibrary from './pages/AddLibrary';
 import AllUsers from './pages/AllUsers';
@@ -34,33 +35,35 @@ function App() {
       authorizationParams={auth0Config.authorizationParams}
     >
       <Router>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            <Route path="/add-library" element={<ProtectedRoute><AddLibrary /></ProtectedRoute>} />
-            <Route path="/libraries" element={<ProtectedRoute><AllLibraries /></ProtectedRoute>} />
-            <Route path="/library/:id" element={<ProtectedRoute><LibraryDetails /></ProtectedRoute>} />
-            <Route path="/my-libraries" element={<ProtectedRoute><MyLibraries /></ProtectedRoute>} />
-            <Route path="/edit-library/:id" element={<ProtectedRoute><EditLibrary /></ProtectedRoute>} />
-            <Route path="/users" element={<ProtectedRoute><AllUsers /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-          <ToastContainer
-            position="top-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="dark"
-          />
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/add-library" element={<ProtectedRoute><AddLibrary /></ProtectedRoute>} />
+              <Route path="/libraries" element={<ProtectedRoute><AllLibraries /></ProtectedRoute>} />
+              <Route path="/library/:id" element={<ProtectedRoute><LibraryDetails /></ProtectedRoute>} />
+              <Route path="/my-libraries" element={<ProtectedRoute><MyLibraries /></ProtectedRoute>} />
+              <Route path="/edit-library/:id" element={<ProtectedRoute><EditLibrary /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute><AllUsers /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+            <ToastContainer
+              position="top-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="dark"
+            />
+          </AuthProvider>
+        </ThemeProvider>
       </Router>
     </Auth0Provider>
   );

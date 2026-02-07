@@ -1,17 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-    Armchair, ZoomIn, ZoomOut, User, Move, 
-    RotateCcw, MapPin, Info 
+import { useTheme } from '../context/ThemeContext';
+import {
+    Armchair, ZoomIn, ZoomOut, User, Move,
+    RotateCcw, MapPin, Info
 } from 'lucide-react';
 
 const UserSeatMap = ({ seats, activeSeatId }) => {
+    const { theme } = useTheme();
     // --- Viewport State ---
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const containerRef = useRef(null);
-    
+
     // Calculate canvas boundaries based on seats
     const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
 
@@ -65,27 +67,27 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
         // Base seat shape styling
         const base = "absolute rounded-lg flex flex-col items-center justify-center transition-all duration-300 shadow-sm";
         const size = "w-12 h-12";
-        
+
         if (isMySeat) {
             return `${base} ${size} bg-indigo-600 border border-indigo-400 text-white z-20 shadow-[0_0_20px_rgba(79,70,229,0.6)]`;
         }
 
         switch (seat.status) {
             case 'Maintenance':
-                return `${base} ${size} bg-red-900/20 border border-red-900/50 text-red-700 cursor-not-allowed`;
-            case 'Occupied': // Assuming you might have this status
-                return `${base} ${size} bg-slate-800 border border-slate-700 text-slate-500`;
+                return `${base} ${size} bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-700 cursor-not-allowed`;
+            case 'Occupied': // Since we only show layout, occupied might look different
+                return `${base} ${size} bg-gray-200 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-500`;
             default: // Available/Standard
-                return `${base} ${size} bg-slate-800/50 border border-slate-600/50 text-slate-400 hover:border-purple-500 hover:text-purple-400 hover:bg-slate-700`;
+                return `${base} ${size} bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-600/50 text-gray-400 dark:text-slate-400 hover:border-purple-500 hover:text-purple-500 hover:bg-gray-50 dark:hover:bg-slate-700`;
         }
     };
 
     return (
         <div className="flex flex-col gap-4 w-full">
-            
+
             {/* --- HUD: Controls & Legend --- */}
-            <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 bg-[#0F0F12] p-4 rounded-2xl border border-white/10 shadow-xl">
-                
+            <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 bg-white dark:bg-[#0F0F12] p-4 rounded-2xl border border-gray-200 dark:border-white/10 shadow-xl transition-colors">
+
                 {/* Legend */}
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
@@ -93,37 +95,37 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
                         </span>
-                        <span className="text-gray-300 text-xs font-bold uppercase tracking-wider">You</span>
+                        <span className="text-gray-500 dark:text-gray-300 text-xs font-bold uppercase tracking-wider">You</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded bg-slate-700 border border-slate-600"></div>
+                        <div className="w-3 h-3 rounded bg-gray-200 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Taken</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded bg-slate-800 border border-slate-600"></div>
+                        <div className="w-3 h-3 rounded bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Empty</span>
                     </div>
                 </div>
 
                 {/* Toolbar */}
-                <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1 border border-white/5 backdrop-blur-sm">
-                    <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-xl p-1 border border-gray-200 dark:border-white/5 backdrop-blur-sm">
+                    <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                         <ZoomOut size={16} />
                     </button>
-                    <span className="w-12 text-center text-xs font-mono text-gray-400">{Math.round(scale * 100)}%</span>
-                    <button onClick={() => setScale(s => Math.min(2, s + 0.2))} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+                    <span className="w-12 text-center text-xs font-mono text-gray-500 dark:text-gray-400">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => setScale(s => Math.min(2, s + 0.2))} className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                         <ZoomIn size={16} />
                     </button>
-                    <div className="w-px h-4 bg-white/10 mx-1"></div>
-                    <button onClick={resetView} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors" title="Reset View">
+                    <div className="w-px h-4 bg-gray-300 dark:bg-white/10 mx-1"></div>
+                    <button onClick={resetView} className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" title="Reset View">
                         <RotateCcw size={16} />
                     </button>
                 </div>
             </div>
 
             {/* --- THE CANVAS --- */}
-            <div 
-                className="relative w-full h-[600px] bg-[#050505] rounded-3xl overflow-hidden border border-white/10 shadow-2xl group"
+            <div
+                className="relative w-full h-[600px] bg-gray-50 dark:bg-[#050505] rounded-3xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-2xl group transition-colors"
                 ref={containerRef}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -133,20 +135,20 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                 style={{ cursor: 'grab' }}
             >
                 {/* Architectural Grid Pattern */}
-                <div 
+                <div
                     className="absolute inset-0 pointer-events-none opacity-20"
                     style={{
                         backgroundImage: `
-                            linear-gradient(to right, #333 1px, transparent 1px),
-                            linear-gradient(to bottom, #333 1px, transparent 1px)
+                            linear-gradient(to right, ${theme === 'dark' ? '#333' : '#e5e7eb'} 1px, transparent 1px),
+                            linear-gradient(to bottom, ${theme === 'dark' ? '#333' : '#e5e7eb'} 1px, transparent 1px)
                         `,
                         backgroundSize: `${40 * scale}px ${40 * scale}px`,
                         backgroundPosition: `${position.x}px ${position.y}px` // Sync grid with pan
-                    }} 
+                    }}
                 />
 
                 {/* Movable Container */}
-                <div 
+                <div
                     className="absolute origin-top-left transition-transform duration-75 ease-linear will-change-transform"
                     style={{
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
@@ -156,7 +158,7 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                 >
                     {seats.map((seat) => {
                         const isMySeat = activeSeatId && seat._id.toString() === activeSeatId.toString();
-                        
+
                         return (
                             <div
                                 key={seat._id}
@@ -168,7 +170,7 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                             >
                                 {/* Seat Number */}
                                 <span className="text-[10px] font-mono font-bold">{seat.seatNumber}</span>
-                                
+
                                 {/* Furniture Detail (Armrests) */}
                                 <div className={`absolute -left-1 w-1 h-8 rounded-l-sm ${isMySeat ? 'bg-indigo-500' : 'bg-white/10'}`}></div>
                                 <div className={`absolute -right-1 w-1 h-8 rounded-r-sm ${isMySeat ? 'bg-indigo-500' : 'bg-white/10'}`}></div>
@@ -199,15 +201,15 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                     {/* Empty State */}
                     {seats.length === 0 && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                                <Armchair size={32} className="text-gray-600" />
+                            <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
+                                <Armchair size={32} className="text-gray-400 dark:text-gray-600" />
                             </div>
                             <p className="text-gray-500 font-medium">No floor plan available</p>
                         </div>
                     )}
                 </div>
             </div>
-            
+
             <p className="flex items-center justify-center gap-2 text-xs text-gray-500 font-mono opacity-60">
                 <Move size={12} />
                 <span>Click & Drag to Pan</span>

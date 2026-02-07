@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@theme {
+  --animate-ping: ping 3s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Force dark mode class strategy */
+@variant dark (&:where(.dark, .dark *));
+
 /* Custom styles */
 body {
   min-height: 100vh;

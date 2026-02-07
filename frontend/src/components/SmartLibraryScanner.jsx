@@ -189,9 +189,9 @@ const SmartLibraryScanner = ({ onClose }) => {
 
   // 5. PAYMENT / ERROR SCREEN
   if (scanResult === 'SHOW_PLANS' || scanResult === 'ERROR') return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-6 relative">
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-[#050505] p-6 relative transition-colors">
       <CloseButton />
-      <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md text-center">
+      <div className="bg-white dark:bg-[#0F0F12] p-6 rounded-2xl shadow-xl w-full max-w-md text-center border border-gray-200 dark:border-white/10">
 
         {scanResult === 'ERROR' ? (
           <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
@@ -199,29 +199,29 @@ const SmartLibraryScanner = ({ onClose }) => {
           <CreditCard size={48} className="mx-auto text-blue-500 mb-4" />
         )}
 
-        <h2 className="text-xl font-bold text-gray-800">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
           {scanResult === 'ERROR' ? "Access Denied" : "Subscription Required"}
         </h2>
 
-        <p className="text-gray-500 mb-6 mt-2">{message}</p>
+        <p className="text-gray-500 dark:text-gray-400 mb-6 mt-2">{message}</p>
 
         {scanResult === 'SHOW_PLANS' && (
           <div className="space-y-3 text-left">
-            <div className="border p-4 rounded-lg flex justify-between items-center cursor-pointer hover:border-blue-500 transition">
+            <div className="border border-gray-200 dark:border-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer hover:border-blue-500 transition bg-white dark:bg-white/5">
               <div>
-                <p className="font-bold text-gray-800">Daily Pass</p>
-                <p className="text-xs text-gray-500">24 Hours Access</p>
+                <p className="font-bold text-gray-900 dark:text-white">Daily Pass</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">24 Hours Access</p>
               </div>
-              <span className="font-bold text-blue-600">₹50</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400">₹50</span>
             </div>
-            <div className="border p-4 rounded-lg flex justify-between items-center cursor-pointer border-blue-500 bg-blue-50">
+            <div className="border p-4 rounded-lg flex justify-between items-center cursor-pointer border-blue-500 bg-blue-50 dark:bg-blue-900/20">
               <div>
-                <p className="font-bold text-gray-800">Monthly Pass</p>
-                <p className="text-xs text-gray-500">30 Days Access</p>
+                <p className="font-bold text-gray-900 dark:text-white">Monthly Pass</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">30 Days Access</p>
               </div>
-              <span className="font-bold text-blue-600">₹800</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400">₹800</span>
             </div>
-            <button className="w-full bg-black text-white py-3 rounded-lg font-bold mt-6 hover:bg-gray-800 transition">
+            <button className="w-full bg-black dark:bg-white text-white dark:text-black py-3 rounded-lg font-bold mt-6 hover:opacity-80 transition">
               Proceed to Pay
             </button>
           </div>
@@ -230,7 +230,7 @@ const SmartLibraryScanner = ({ onClose }) => {
         {scanResult === 'ERROR' && (
           <button
             onClick={() => setScanResult(null)}
-            className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold mt-6"
+            className="w-full bg-gray-900 dark:bg-white text-white dark:text-black py-3 rounded-lg font-bold mt-6"
           >
             Try Again
           </button>
