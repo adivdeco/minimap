@@ -1,274 +1,218 @@
-// import React, { useState, useRef, useEffect } from 'react';
-// import {
-//     User,
-//     Armchair,
-//     ZoomIn,
-//     ZoomOut,
-//     MapPin
-// } from 'lucide-react';
-
-// const UserSeatMap = ({ seats, activeSeatId }) => {
-//     const [zoom, setZoom] = useState(1);
-//     const containerRef = useRef(null);
-//     const [canvasHeight, setCanvasHeight] = useState(600);
-
-//     // Auto-adjust height based on seat positions
-//     useEffect(() => {
-//         if (!seats || seats.length === 0) return;
-//         const maxSeatY = Math.max(0, ...seats.map(s => s.y || 0));
-//         if (maxSeatY + 150 > canvasHeight) {
-//             setCanvasHeight(maxSeatY + 200);
-//         }
-//     }, [seats]);
-
-//     const getStatusStyles = (status, isMySeat) => {
-//         if (isMySeat) return 'bg-purple-600 border-purple-800 text-white ring-4 ring-purple-400/50 z-20 shadow-xl scale-110';
-
-//         switch (status) {
-//             // case 'Available':
-//             //     return 'bg-white border-green-500 text-green-700 hover:bg-green-50';
-//             // case 'Occupied':
-//             //     return 'bg-red-50 border-red-500 text-red-700 opacity-80';
-//             // case 'Reserved':
-//             //     return 'bg-blue-50 border-blue-500 text-blue-700 opacity-80';
-//             case 'Maintenance':
-//                 return 'bg-gray-100 border-gray-400 text-gray-400 cursor-not-allowed opacity-60';
-//             default:
-//                 return 'bg-white border-gray-200 text-gray-600';
-//         }
-//     };
-
-//     return (
-//         <div className="flex flex-col gap-4">
-//             {/* Toolbar */}
-//             <div className="flex justify-between items-center bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10">
-//                 <div className="flex items-center gap-4">
-//                     <div className="flex items-center gap-2">
-//                         <div className="w-4 h-4 rounded bg-purple-600 border border-purple-800"></div>
-//                         <span className="text-white text-xs font-medium">Your Seat</span>
-//                     </div>
-//                     <div className="flex items-center gap-2">
-//                         <div className="w-4 h-4 rounded bg-white border border-green-500"></div>
-//                         <span className="text-gray-300 text-xs">Available</span>
-//                     </div>
-//                     <div className="flex items-center gap-2">
-//                         <div className="w-4 h-4 rounded bg-red-50 border border-red-500"></div>
-//                         <span className="text-gray-300 text-xs">Occupied</span>
-//                     </div>
-//                 </div>
-
-//                 {/* Zoom Controls */}
-//                 <div className="flex items-center bg-white/10 rounded-lg p-1 border border-white/20">
-//                     <button onClick={() => setZoom(z => Math.max(0.5, z - 0.1))} className="p-1.5 hover:bg-white/10 rounded-md text-white transition">
-//                         <ZoomOut size={16} />
-//                     </button>
-//                     <span className="text-xs font-mono w-12 text-center text-white">{(zoom * 100).toFixed(0)}%</span>
-//                     <button onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} className="p-1.5 hover:bg-white/10 rounded-md text-white transition">
-//                         <ZoomIn size={16} />
-//                     </button>
-//                 </div>
-//             </div>
-
-//             {/* Map Container */}
-//             <div className="relative w-full overflow-auto bg-slate-900/50 border border-white/10 rounded-2xl shadow-inner scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent h-[600px]">
-//                 <div
-//                     ref={containerRef}
-//                     className="relative origin-top-left transition-transform duration-200 ease-out"
-//                     style={{
-//                         height: `${canvasHeight}px`,
-//                         width: '1000px', // Standard width basis
-//                         transform: `scale(${zoom})`,
-//                         backgroundImage: 'radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px)',
-//                         backgroundSize: '20px 20px'
-//                     }}
-//                 >
-//                     {seats.map((seat) => {
-//                         const isMySeat = activeSeatId && seat._id.toString() === activeSeatId.toString();
-
-//                         return (
-//                             <div
-//                                 key={seat._id}
-//                                 className={`
-//                                     absolute w-12 h-12 rounded-lg border-2 shadow-sm flex flex-col items-center justify-center select-none
-//                                     transition-all duration-200
-//                                     ${getStatusStyles(seat.status, isMySeat)}
-//                                 `}
-//                                 style={{
-//                                     left: seat.x || 0,
-//                                     top: seat.y || 0
-//                                 }}
-//                             >
-//                                 <span className="text-[9px] font-bold uppercase opacity-80 leading-none mb-0.5 max-w-full truncate px-1">
-//                                     {seat.category?.slice(0, 4)}
-//                                 </span>
-//                                 <span className="text-sm font-extrabold leading-none">{seat.seatNumber}</span>
-
-//                                 {isMySeat && (
-//                                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-//                                         <div className="bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap animate-bounce">
-//                                             You
-//                                         </div>
-//                                     </div>
-//                                 )}
-//                             </div>
-//                         );
-//                     })}
-
-//                     {seats.length === 0 && (
-//                         <div className="absolute inset-0 flex items-center justify-center text-gray-500">
-//                             <div className="text-center">
-//                                 <Armchair className="mx-auto mb-2 opacity-20" size={48} />
-//                                 <p>No seats available to view.</p>
-//                             </div>
-//                         </div>
-//                     )}
-//                 </div>
-//             </div>
-
-//             <p className="text-xs text-center text-gray-500">
-//                 You can scroll or pinch to verify your location on the map.
-//             </p>
-//         </div>
-//     );
-// };
-
-// export default UserSeatMap;
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Armchair, ZoomIn, ZoomOut, User } from 'lucide-react';
+import { 
+    Armchair, ZoomIn, ZoomOut, User, Move, 
+    RotateCcw, MapPin, Info 
+} from 'lucide-react';
 
 const UserSeatMap = ({ seats, activeSeatId }) => {
-    const [zoom, setZoom] = useState(1);
+    // --- Viewport State ---
+    const [scale, setScale] = useState(1);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const containerRef = useRef(null);
-    const [canvasHeight, setCanvasHeight] = useState(600);
+    
+    // Calculate canvas boundaries based on seats
+    const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
 
-    // Auto-adjust height based on seat positions
     useEffect(() => {
         if (!seats || seats.length === 0) return;
-        const maxSeatY = Math.max(0, ...seats.map(s => s.y || 0));
-        if (maxSeatY + 150 > canvasHeight) {
-            setCanvasHeight(maxSeatY + 200);
-        }
+        const maxX = Math.max(0, ...seats.map(s => s.x || 0));
+        const maxY = Math.max(0, ...seats.map(s => s.y || 0));
+        setCanvasSize({
+            width: Math.max(1200, maxX + 300),
+            height: Math.max(800, maxY + 300)
+        });
     }, [seats]);
 
-    const getStatusStyles = (status, isMySeat) => {
+    // --- Pan & Zoom Handlers ---
+    const handleMouseDown = (e) => {
+        setIsDragging(true);
+        setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+        containerRef.current.style.cursor = 'grabbing';
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        setPosition({
+            x: e.clientX - dragStart.x,
+            y: e.clientY - dragStart.y
+        });
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+        if (containerRef.current) containerRef.current.style.cursor = 'grab';
+    };
+
+    const handleWheel = (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            const newScale = Math.min(Math.max(0.5, scale + delta), 2);
+            setScale(newScale);
+        }
+    };
+
+    const resetView = () => {
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
+    };
+
+    // --- Styling Logic ---
+    const getSeatStyles = (seat, isMySeat) => {
+        // Base seat shape styling
+        const base = "absolute rounded-lg flex flex-col items-center justify-center transition-all duration-300 shadow-sm";
+        const size = "w-12 h-12";
+        
         if (isMySeat) {
-            return 'bg-gradient-to-br from-indigo-500 to-purple-600 border-indigo-400 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)] z-20 scale-110 ring-2 ring-indigo-400/30';
+            return `${base} ${size} bg-indigo-600 border border-indigo-400 text-white z-20 shadow-[0_0_20px_rgba(79,70,229,0.6)]`;
         }
 
-        switch (status) {
+        switch (seat.status) {
             case 'Maintenance':
-                return 'bg-slate-800/50 border-slate-700 text-slate-600 cursor-not-allowed';
-            // case 'Available': // Uncomment if you track available explicitly
-            //    return 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20';
-            default: // Occupied or Standard
-                return 'bg-slate-800 border-slate-700 text-slate-500';
+                return `${base} ${size} bg-red-900/20 border border-red-900/50 text-red-700 cursor-not-allowed`;
+            case 'Occupied': // Assuming you might have this status
+                return `${base} ${size} bg-slate-800 border border-slate-700 text-slate-500`;
+            default: // Available/Standard
+                return `${base} ${size} bg-slate-800/50 border border-slate-600/50 text-slate-400 hover:border-purple-500 hover:text-purple-400 hover:bg-slate-700`;
         }
     };
 
     return (
-        <div className="flex flex-col gap-6">
-            {/* Control Bar (HUD Style) */}
-            <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/40 backdrop-blur-md p-3 rounded-2xl border border-white/5 shadow-lg">
+        <div className="flex flex-col gap-4 w-full">
+            
+            {/* --- HUD: Controls & Legend --- */}
+            <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 bg-[#0F0F12] p-4 rounded-2xl border border-white/10 shadow-xl">
                 
                 {/* Legend */}
-                <div className="flex items-center gap-6 px-2">
+                <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>
-                        <span className="text-indigo-200 text-xs font-medium tracking-wide">Your Seat</span>
+                        <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                        </span>
+                        <span className="text-gray-300 text-xs font-bold uppercase tracking-wider">You</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-slate-700 border border-slate-600"></div>
-                        <span className="text-slate-400 text-xs font-medium tracking-wide">Occupied</span>
+                        <div className="w-3 h-3 rounded bg-slate-700 border border-slate-600"></div>
+                        <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Taken</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded bg-slate-800 border border-slate-600"></div>
+                        <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Empty</span>
                     </div>
                 </div>
 
-                {/* Zoom Controls */}
-                <div className="flex items-center gap-2 mt-3 sm:mt-0 bg-black/20 rounded-xl p-1 border border-white/5">
-                    <button 
-                        onClick={() => setZoom(z => Math.max(0.5, z - 0.1))} 
-                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 transition-colors"
-                    >
-                        <ZoomOut size={14} />
+                {/* Toolbar */}
+                <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1 border border-white/5 backdrop-blur-sm">
+                    <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+                        <ZoomOut size={16} />
                     </button>
-                    <span className="text-xs font-mono w-10 text-center text-slate-300">{(zoom * 100).toFixed(0)}%</span>
-                    <button 
-                        onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} 
-                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 transition-colors"
-                    >
-                        <ZoomIn size={14} />
+                    <span className="w-12 text-center text-xs font-mono text-gray-400">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => setScale(s => Math.min(2, s + 0.2))} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+                        <ZoomIn size={16} />
+                    </button>
+                    <div className="w-px h-4 bg-white/10 mx-1"></div>
+                    <button onClick={resetView} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors" title="Reset View">
+                        <RotateCcw size={16} />
                     </button>
                 </div>
             </div>
 
-            {/* Map Canvas */}
-            <div className="relative w-full overflow-hidden bg-[#0f172a] border border-slate-800/60 rounded-3xl shadow-2xl h-[600px] group">
-                
-                {/* Technical Grid Background */}
-                <div className="absolute inset-0 pointer-events-none opacity-20" 
-                     style={{ 
-                         backgroundImage: 'linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px)', 
-                         backgroundSize: '40px 40px' 
-                     }}>
-                </div>
+            {/* --- THE CANVAS --- */}
+            <div 
+                className="relative w-full h-[600px] bg-[#050505] rounded-3xl overflow-hidden border border-white/10 shadow-2xl group"
+                ref={containerRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onWheel={handleWheel}
+                style={{ cursor: 'grab' }}
+            >
+                {/* Architectural Grid Pattern */}
+                <div 
+                    className="absolute inset-0 pointer-events-none opacity-20"
+                    style={{
+                        backgroundImage: `
+                            linear-gradient(to right, #333 1px, transparent 1px),
+                            linear-gradient(to bottom, #333 1px, transparent 1px)
+                        `,
+                        backgroundSize: `${40 * scale}px ${40 * scale}px`,
+                        backgroundPosition: `${position.x}px ${position.y}px` // Sync grid with pan
+                    }} 
+                />
 
-                <div className="w-full h-full overflow-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700/50">
-                    <div
-                        ref={containerRef}
-                        className="relative origin-top-left transition-transform duration-300 ease-out"
-                        style={{
-                            height: `${canvasHeight}px`,
-                            width: '1000px',
-                            transform: `scale(${zoom})`,
-                        }}
-                    >
-                        {seats.map((seat) => {
-                            const isMySeat = activeSeatId && seat._id.toString() === activeSeatId.toString();
+                {/* Movable Container */}
+                <div 
+                    className="absolute origin-top-left transition-transform duration-75 ease-linear will-change-transform"
+                    style={{
+                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                        width: canvasSize.width,
+                        height: canvasSize.height,
+                    }}
+                >
+                    {seats.map((seat) => {
+                        const isMySeat = activeSeatId && seat._id.toString() === activeSeatId.toString();
+                        
+                        return (
+                            <div
+                                key={seat._id}
+                                className={`group/seat ${getSeatStyles(seat, isMySeat)}`}
+                                style={{
+                                    left: seat.x,
+                                    top: seat.y,
+                                }}
+                            >
+                                {/* Seat Number */}
+                                <span className="text-[10px] font-mono font-bold">{seat.seatNumber}</span>
+                                
+                                {/* Furniture Detail (Armrests) */}
+                                <div className={`absolute -left-1 w-1 h-8 rounded-l-sm ${isMySeat ? 'bg-indigo-500' : 'bg-white/10'}`}></div>
+                                <div className={`absolute -right-1 w-1 h-8 rounded-r-sm ${isMySeat ? 'bg-indigo-500' : 'bg-white/10'}`}></div>
 
-                            return (
-                                <div
-                                    key={seat._id}
-                                    className={`
-                                        absolute w-12 h-12 rounded-xl border flex flex-col items-center justify-center select-none
-                                        transition-all duration-300
-                                        ${getStatusStyles(seat.status, isMySeat)}
-                                    `}
-                                    style={{
-                                        left: seat.x || 0,
-                                        top: seat.y || 0
-                                    }}
-                                >
-                                    <span className="text-[8px] font-bold uppercase opacity-60 leading-none mb-1 max-w-full truncate px-1 tracking-wider">
-                                        {seat.category?.slice(0, 3)}
-                                    </span>
-                                    <span className="text-sm font-bold leading-none font-mono">
-                                        {seat.seatNumber}
-                                    </span>
-
-                                    {isMySeat && (
-                                        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-                                            <div className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg whitespace-nowrap mb-1">
-                                                You
+                                {/* "MY SEAT" Beacon Animation */}
+                                {isMySeat && (
+                                    <>
+                                        <div className="absolute -inset-4 rounded-full border border-indigo-500/30 animate-[ping_3s_ease-in-out_infinite]"></div>
+                                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center z-30 animate-bounce">
+                                            <div className="bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg whitespace-nowrap">
+                                                You are here
                                             </div>
-                                            <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-indigo-600"></div>
+                                            <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-indigo-600"></div>
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                    </>
+                                )}
 
-                        {seats.length === 0 && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-600">
-                                <Armchair className="mb-4 opacity-20" size={64} strokeWidth={1} />
-                                <p className="text-sm font-light tracking-widest uppercase">Map Unavailable</p>
+                                {/* Hover Tooltip (Only visible on hover) */}
+                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-max bg-gray-900 text-white text-xs px-3 py-2 rounded-lg border border-white/10 opacity-0 group-hover/seat:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
+                                    <div className="font-bold mb-0.5">Seat {seat.seatNumber}</div>
+                                    <div className="text-gray-400 capitalize text-[10px]">{seat.category || 'Standard'}</div>
+                                    <div className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 border-b border-r border-white/10 rotate-45"></div>
+                                </div>
                             </div>
-                        )}
-                    </div>
+                        );
+                    })}
+
+                    {/* Empty State */}
+                    {seats.length === 0 && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-4">
+                                <Armchair size={32} className="text-gray-600" />
+                            </div>
+                            <p className="text-gray-500 font-medium">No floor plan available</p>
+                        </div>
+                    )}
                 </div>
             </div>
-
-            <p className="text-xs text-center text-slate-500 font-light tracking-wide">
-                Use pinch gestures or scroll to navigate the floor plan
+            
+            <p className="flex items-center justify-center gap-2 text-xs text-gray-500 font-mono opacity-60">
+                <Move size={12} />
+                <span>Click & Drag to Pan</span>
+                <span className="mx-2">•</span>
+                <span>Scroll to Zoom</span>
             </p>
         </div>
     );
