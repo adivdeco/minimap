@@ -17,6 +17,20 @@ const authMiddleware = async (req, res, next) => {
             finduser = await User.findById(decoded.userId)
                 .select('-password')
                 .populate('studentDetails.currentSubscription.libraryId', 'libraryName')
+                .populate({
+                    path: 'studentDetails.currentSubscription.planId',
+                    model: 'Plan',
+                    select: 'name durationInDays'
+                })
+                .populate({
+                    path: 'studentDetails.currentSubscription.subscriptionId',
+                    model: 'Subscription',
+                    populate: {
+                        path: 'planId',
+                        model: 'Plan',
+                        select: 'name durationInDays'
+                    }
+                })
                 .lean();
             if (finduser) {
                 userCache.set(cacheKey, finduser);

@@ -53,9 +53,23 @@ const Home = () => {
     // Handle both populated object and raw ID safely
     const libraryId = subscription?.libraryId?._id || subscription?.libraryId;
     const libraryName = subscription?.libraryId?.libraryName;
+
+    // Plan Details (Now populated with deep check)
+    // 1. Direct planId on user object
+    // 2. Deep populated via subscriptionId -> planId
+    const planDetails = subscription?.planId || subscription?.subscriptionId?.planId;
+    const planName = planDetails?.name || subscription?.planName || "Library Pass";
+    const totalDuration = planDetails?.durationInDays || 30; // Default fallback
+
     const expiryDate = subscription?.expiryDate ? new Date(subscription.expiryDate) : null;
-    const daysLeft = expiryDate ? Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24)) : 0;
-    const hasSubscription = !!subscription;
+    const startDate = subscription?.startDate ? new Date(subscription.startDate) : new Date();
+
+    // Calculate Days Left & Progress
+    const daysLeft = expiryDate ? Math.max(0, Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24))) : 0;
+    const daysElapsed = Math.max(0, Math.ceil((new Date() - startDate) / (1000 * 60 * 60 * 24)));
+    const progressPercentage = Math.min(100, Math.max(0, (daysElapsed / totalDuration) * 100));
+
+    const hasSubscription = !!subscription && subscription.status === 'active';
 
     useEffect(() => {
         const fetchSeats = async () => {
@@ -326,10 +340,10 @@ const Home = () => {
                         <motion.div variants={itemVariants} className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-6 flex flex-col shadow-xl dark:shadow-none">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                                 <CreditCard size={18} className="text-purple-600 dark:text-purple-400" />
-                                Your Pass
+                                {planName}
                             </h3>
 
-                            {subscription ? (
+                            {hasSubscription ? (
                                 <div className="flex-1 flex flex-col justify-between">
                                     <div className="space-y-4">
                                         <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5">
@@ -339,10 +353,17 @@ const Home = () => {
                                             </p>
                                         </div>
                                         <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5">
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Days Remaining</p>
-                                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{daysLeft} Days</p>
-                                            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-3 overflow-hidden">
-                                                <div className="h-full bg-purple-500 w-[70%]"></div>
+                                            <div className="flex justify-between items-end mb-1">
+                                                <p className="text-sm text-gray-500 dark:text-gray-400">Days Remaining</p>
+                                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{daysLeft} <span className="text-sm text-gray-400 font-normal">/ {totalDuration}</span></p>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${progressPercentage}%` }}
+                                                    transition={{ duration: 1, ease: 'easeOut' }}
+                                                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                                                />
                                             </div>
                                         </div>
                                     </div>
