@@ -1,15 +1,13 @@
 const Library = require('../models/LibrarySchema');
 const Seat = require('../models/Seat');
 const Subscription = require('../models/Subscription');
-// IMPORT NOTE: Ensure this file contains the "Daily Bucket" Schema we discussed
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
-const authMiddleware = require('../middleware/authMiddleware');
 const Plan = require('../models/Plan');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // --- CONFIGURATION ---
 const MAX_DAILY_CHECKINS = 3;
-const MIN_SESSION_MINUTES = 5;
 
 // --- HELPER: Get Today's Usage Stats ---
 async function getDailyStats(userId, libraryId) {
@@ -32,6 +30,22 @@ async function getDailyStats(userId, libraryId) {
     };
 }
 
+// --- HELPER: Resolve Plan Details (Handles Embedded vs Standalone) ---
+async function resolvePlan(planId, library) {
+    // 1. Try finding in standalone Plan collection
+    let plan = await Plan.findById(planId);
+
+    // 2. If not found, look in Library's embedded plans
+    if (!plan && library.plans && library.plans.length > 0) {
+        plan = library.plans.id(planId);
+    }
+
+    return plan;
+}
+
+// ==========================================
+// 1. CHECK-IN CONTROLLER
+// ==========================================
 exports.checkIn = async (req, res) => {
     try {
         const { qrCodeString } = req.body;
@@ -41,7 +55,7 @@ exports.checkIn = async (req, res) => {
         const library = await Library.findOne({ 'accessConfig.qrCodeData': qrCodeString });
         if (!library) return res.status(404).json({ success: false, msg: "Invalid QR Code" });
 
-        // 2. Prevent Double Entry
+        // 2. Prevent Double Entry (User already sitting?)
         const existingSeat = await Seat.findOne({ currentOccupant: userId });
         if (existingSeat) {
             return res.status(400).json({
@@ -50,9 +64,8 @@ exports.checkIn = async (req, res) => {
             });
         }
 
-        // --- SECURITY CHECK: DAILY LIMITS ---
+        // 3. Security Check: Daily Limits
         const dailyStats = await getDailyStats(userId, library._id);
-
         if (dailyStats.sessionsCount >= MAX_DAILY_CHECKINS) {
             return res.status(403).json({
                 success: false,
@@ -60,7 +73,8 @@ exports.checkIn = async (req, res) => {
             });
         }
 
-        // 3. Check for ACTIVE Subscription
+        // 4. Check for ACTIVE Subscription
+        // We look for a Subscription document that is active and not expired
         const activeSub = await Subscription.findOne({
             userId,
             libraryId: library._id,
@@ -68,64 +82,73 @@ exports.checkIn = async (req, res) => {
             expiryDate: { $gt: new Date() }
         });
 
-        // --- PATH A: USER HAS VALID PASS ---
+        // --- SCENARIO A: USER HAS VALID SUBSCRIPTION ---
         if (activeSub) {
-            return await assignSeat(library, userId, activeSub.planId, res, dailyStats);
+            // Pass the full activeSub object so we can link IDs correctly
+            return await assignSeat(library, userId, activeSub, res, dailyStats);
         }
 
-        // --- PATH B: TRIAL CHECKS ---
+        // --- SCENARIO B: NO ACTIVE SUBSCRIPTION (CHECK FOR TRIAL ELIGIBILITY) ---
+
+        // Check if they ever had a subscription (even expired/cancelled)
         const history = await Subscription.exists({ userId, libraryId: library._id });
+
+        // If they have history, they are NOT eligible for a trial -> Show Plans
         if (history) {
             return res.status(200).json({
                 success: false,
                 action: 'SHOW_PLANS',
                 libraryId: library._id,
-                msg: "Subscription expired. Please renew."
+                plans: library.plans, // Send real plans
+                msg: "Your subscription has expired. Please renew to enter."
             });
         }
 
+        // If no history, find a Trial Plan in this library
+        // We look in embedded plans first as trials are usually specific to library config
         const trialPlan = library.plans.find(p => p.trialDays > 0);
+
         if (trialPlan) {
             return res.status(200).json({
                 success: false,
-                action: 'OFFER_TRIAL',
+                action: 'OFFER_TRIAL', // Frontend should show "Start Free Trial" button
                 libraryId: library._id,
                 planId: trialPlan._id,
                 trialDays: trialPlan.trialDays,
-                msg: `Eligible for ${trialPlan.trialDays}-Day Free Trial.`
+                msg: `Welcome! You are eligible for a ${trialPlan.trialDays}-Day Free Trial.`
             });
         }
 
+        // No history, but no trial plan exists
         return res.status(200).json({
             success: false,
             action: 'SHOW_PLANS',
             libraryId: library._id,
-            msg: "Please choose a plan."
+            plans: library.plans, // Send real plans
+            msg: "Welcome! Please choose a plan to start."
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, msg: "Server Error" });
+        console.error("CheckIn Error:", err);
+        res.status(500).json({ success: false, msg: "Server Error during Check-in" });
     }
 };
 
-// --- UPDATED ASSIGN SEAT LOGIC ---
-async function assignSeat(library, userId, planId, res, dailyStats = { minutesUsed: 0 }) {
-    const now = new Date();
+// ==========================================
+// 2. ASSIGN SEAT LOGIC (Centralized)
+// ==========================================
+async function assignSeat(library, userId, subscription, res, dailyStats = { minutesUsed: 0 }) {
+    constnow = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. Determine Plan Limits
-    let hoursPerDay = 5;
-    let planDoc = await Plan.findById(planId);
-    if (!planDoc) {
-        planDoc = library.plans.id(planId);
-    }
-    if (planDoc && planDoc.hoursPerDay) {
-        hoursPerDay = planDoc.hoursPerDay;
-    }
+    // 1. Get Plan Details (Hours per day limit)
+    const planDoc = await resolvePlan(subscription.planId, library);
 
-    // 2. Calculate REMAINING Time
+    // Default to 5 hours if plan not found or limit not set
+    let hoursPerDay = (planDoc && planDoc.hoursPerDay) ? planDoc.hoursPerDay : 5;
+
+    // 2. Calculate Remaining Time
     const maxMinutes = hoursPerDay * 60;
     const usedMinutes = dailyStats.minutesUsed;
     let remainingMinutes = maxMinutes - usedMinutes;
@@ -137,44 +160,45 @@ async function assignSeat(library, userId, planId, res, dailyStats = { minutesUs
         });
     }
 
-    const expectedEndTime = new Date(now.getTime() + remainingMinutes * 60000);
+    const expectedEndTime = new Date(Date.now() + remainingMinutes * 60000);
 
-    // 3. Find Seat (Optimized via Aggregation)
+    // 3. Find an Available Seat
+    // Using aggregation for random selection prevents "always picking Seat 1"
     const randomSeatResult = await Seat.aggregate([
         { $match: { libraryId: library._id, status: 'Available' } },
         { $sample: { size: 1 } }
     ]);
 
     if (!randomSeatResult || randomSeatResult.length === 0) {
-        return res.status(400).json({ success: false, msg: "Library is full!" });
+        return res.status(400).json({ success: false, msg: "Library is full! No seats available." });
     }
 
     const selectedSeat = randomSeatResult[0];
 
-    // 4. Update Seat
+    // 4. Lock the Seat (Atomic Operation)
     const availableSeat = await Seat.findOneAndUpdate(
         { _id: selectedSeat._id, status: 'Available' },
         {
             status: 'Occupied',
             currentOccupant: userId,
-            occupiedSince: now,
+            occupiedSince: new Date(),
             expectedEndTime: expectedEndTime
         },
         { new: true }
     );
 
     if (!availableSeat) {
-        return res.status(400).json({ success: false, msg: "Seat snagged! Try again." });
+        return res.status(400).json({ success: false, msg: "Seat was just taken! Please try scanning again." });
     }
 
-    // 5. Create Attendance Record (Bucket Upsert)
+    // 5. Update Attendance Bucket (Log the session start)
     await Attendance.findOneAndUpdate(
         { userId, libraryId: library._id, date: today },
         {
             $push: {
                 sessions: {
                     seatNumber: availableSeat.seatNumber,
-                    checkInTime: now,
+                    checkInTime: new Date(),
                     checkOutTime: null,
                     durationMinutes: 0
                 }
@@ -184,19 +208,30 @@ async function assignSeat(library, userId, planId, res, dailyStats = { minutesUs
         { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // 6. Update User Context
+    // 6. UPDATE USER CONTEXT (CRITICAL FIX)
+    // We must link the *specific* subscription ID here.
     await User.findByIdAndUpdate(userId, {
         $set: {
+            // Seat Details
             'studentDetails.assignedSeat': {
                 seatId: availableSeat._id,
                 seatNumber: availableSeat.seatNumber,
-                checkInTime: now,
+                checkInTime: new Date(),
                 expectedEndTime: expectedEndTime
             },
-            'studentDetails.currentSubscription.libraryId': library._id
+            // Subscription Details (Ensures next auth check passes)
+            'studentDetails.currentSubscription': {
+                subscriptionId: subscription._id, // <--- IMPORTANT LINK
+                libraryId: library._id,
+                planId: subscription.planId,
+                startDate: subscription.startDate,
+                expiryDate: subscription.expiryDate,
+                status: 'active'
+            }
         }
     });
 
+    // 7. Refresh Cache
     authMiddleware.invalidateUserCache(userId);
 
     const rHours = Math.floor(remainingMinutes / 60);
@@ -209,69 +244,82 @@ async function assignSeat(library, userId, planId, res, dailyStats = { minutesUs
         checkinsRemaining: MAX_DAILY_CHECKINS - (dailyStats.sessionsCount + 1),
         maxDailyCheckins: MAX_DAILY_CHECKINS,
         remainingTime: { hours: rHours, minutes: rMins },
-        msg: `Checked In! Seat: ${availableSeat.seatNumber}. Time remaining today: ${rHours}h ${rMins}m`
+        msg: `Checked In! Assigned Seat: ${availableSeat.seatNumber}`
     });
 }
 
+// ==========================================
+// 3. ACTIVATE TRIAL CONTROLLER
+// ==========================================
 exports.activateTrial = async (req, res) => {
     try {
         const { libraryId, planId } = req.body;
         const userId = req.finduser._id;
 
+        // Double check eligibility
         const history = await Subscription.exists({ userId, libraryId });
         if (history) return res.status(403).json({ msg: "Trial already used." });
 
         const library = await Library.findById(libraryId);
         if (!library) return res.status(404).json({ msg: "Library not found" });
 
-        const plan = library.plans.id(planId);
-        if (!plan || plan.trialDays <= 0) return res.status(400).json({ msg: "Invalid Trial Plan" });
+        // Find Plan (Embedded or Standalone)
+        const plan = await resolvePlan(planId, library);
 
+        if (!plan || !plan.trialDays || plan.trialDays <= 0) {
+            return res.status(400).json({ msg: "Invalid Trial Plan" });
+        }
+
+        // Calculate Expiry
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + plan.trialDays);
 
+        // CREATE SUBSCRIPTION DOCUMENT
         const newSub = await Subscription.create({
             userId,
             libraryId,
             planId: plan._id,
-            planName: `Free Trial - ${plan.title}`,
+            planName: `Free Trial - ${plan.name || plan.title}`,
             pricePaid: 0,
             startDate: new Date(),
             expiryDate: expiryDate,
             status: 'active'
         });
 
-        // --- BUG FIX IS HERE ---
-        // Was: assignSeat(..., newSub);
-        // Now: We pass a stats object that says "0 minutes used"
+        // Immediately Check User In
+        // Since it's a new trial, stats are 0
         const initialStats = { minutesUsed: 0, sessionsCount: 0 };
 
-        const result = await assignSeat(library, userId, plan._id, res, initialStats);
-
-        authMiddleware.invalidateUserCache(userId);
-        return result;
+        // Pass the 'newSub' object so assignSeat links it to the User
+        return await assignSeat(library, userId, newSub, res, initialStats);
 
     } catch (err) {
-        console.error(err);
-        res.status(500).send("Server Error");
+        console.error("Activate Trial Error:", err);
+        res.status(500).json({ msg: "Failed to activate trial" });
     }
 };
 
-// --- CHECK-OUT LOGIC ---
+// ==========================================
+// 4. CHECK-OUT CONTROLLER
+// ==========================================
 exports.checkOut = async (req, res) => {
     try {
         const userId = req.finduser._id;
 
+        // Find where the user is sitting
         const seat = await Seat.findOne({ currentOccupant: userId });
-        if (!seat) return res.status(400).json({ msg: "Not checked in." });
+        if (!seat) return res.status(400).json({ msg: "You are not currently checked in." });
 
         const checkOutTime = new Date();
 
-        // No minimum duration for calculation logic, but we enforce min 1 minute for data sanity
-        let durationMinutes = seat.occupiedSince ? Math.round((checkOutTime - seat.occupiedSince) / 60000) : 0;
-        if (durationMinutes < 1) durationMinutes = 1;
+        // Calculate Duration
+        let durationMinutes = 0;
+        if (seat.occupiedSince) {
+            durationMinutes = Math.round((checkOutTime - seat.occupiedSince) / 60000);
+        }
+        if (durationMinutes < 1) durationMinutes = 1; // Min 1 min for records
 
-        // Free the Seat first (Lock release)
+        // 1. Release Seat
         await Seat.findByIdAndUpdate(seat._id, {
             status: 'Available',
             currentOccupant: null,
@@ -279,11 +327,11 @@ exports.checkOut = async (req, res) => {
             expectedEndTime: null
         });
 
-        // Fix: Midnight Crossing
-        const bucketDate = new Date(seat.occupiedSince);
+        // 2. Update Attendance (Find today's bucket)
+        // We use $set to update the specific array element where checkOutTime is null
+        const bucketDate = new Date(seat.occupiedSince || new Date());
         bucketDate.setHours(0, 0, 0, 0);
 
-        // Update Attendance Bucket
         await Attendance.findOneAndUpdate(
             {
                 userId,
@@ -300,12 +348,18 @@ exports.checkOut = async (req, res) => {
             }
         );
 
-        // Clear User
-        await User.findByIdAndUpdate(userId, { 'studentDetails.assignedSeat': null });
+        // 3. Clear User's Assigned Seat
+        await User.findByIdAndUpdate(userId, {
+            'studentDetails.assignedSeat': null
+        });
+
         authMiddleware.invalidateUserCache(userId);
 
-        // Fetch stats to show user how much time they have left
+        // 4. Prepare Response Data (Remaining time calculation)
         const dailyStats = await getDailyStats(userId, seat.libraryId);
+
+        // Get limits based on subscription
+        let hoursPerDay = 5;
         const activeSub = await Subscription.findOne({
             userId,
             libraryId: seat.libraryId,
@@ -313,62 +367,73 @@ exports.checkOut = async (req, res) => {
             expiryDate: { $gt: new Date() }
         });
 
-        let hoursPerDay = 5;
         if (activeSub) {
-            const Plan = require('../models/Plan');
-            let planDoc = await Plan.findById(activeSub.planId);
-            if (!planDoc) {
-                const lib = await Library.findById(seat.libraryId);
-                if (lib) planDoc = lib.plans.id(activeSub.planId);
-            }
+            const planDoc = await resolvePlan(activeSub.planId, { _id: seat.libraryId }); // Minimal lib obj
             if (planDoc && planDoc.hoursPerDay) hoursPerDay = planDoc.hoursPerDay;
         }
 
         const maxMinutes = hoursPerDay * 60;
-        const usedMinutes = dailyStats.minutesUsed;
+        const usedMinutes = dailyStats.minutesUsed; // Updated with new session
         const remainingMinutes = Math.max(0, maxMinutes - usedMinutes);
-        const rHours = Math.floor(remainingMinutes / 60);
-        const rMins = Math.floor(remainingMinutes % 60);
 
         res.json({
             success: true,
-            msg: `Checked out. You used ${durationMinutes} mins.`,
+            msg: `Checked out successfully. Session duration: ${durationMinutes} mins.`,
             checkinsRemaining: MAX_DAILY_CHECKINS - dailyStats.sessionsCount,
             maxDailyCheckins: MAX_DAILY_CHECKINS,
-            remainingTime: { hours: rHours, minutes: rMins }
+            remainingTime: {
+                hours: Math.floor(remainingMinutes / 60),
+                minutes: Math.floor(remainingMinutes % 60)
+            }
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).send("Server Error");
+        console.error("CheckOut Error:", err);
+        res.status(500).json({ msg: "Server Error during checkout" });
     }
 };
 
-// --- AUTO-RELEASE CRON JOB ---
+// ==========================================
+// 5. AUTO-RELEASE CRON JOB
+// ==========================================
+// This function should be called by a cron job (e.g., every 5 minutes)
 const releaseExpiredSeats = async () => {
     try {
         const now = new Date();
 
+        // Find occupied seats where time has passed expectedEndTime
         const expiredSeats = await Seat.find({
             status: 'Occupied',
             expectedEndTime: { $lt: now }
         });
 
-        if (expiredSeats.length === 0) return { releasedCount: 0, message: "No seats to release" };
+        if (expiredSeats.length === 0) return { releasedCount: 0 };
 
         let releasedCount = 0;
 
         for (const seat of expiredSeats) {
             try {
-                if (!seat.currentOccupant) continue;
+                if (!seat.currentOccupant) {
+                    // Zombie seat (Occupied status but no user). Just reset it.
+                    seat.status = 'Available';
+                    seat.occupiedSince = null;
+                    seat.expectedEndTime = null;
+                    await seat.save();
+                    continue;
+                }
 
                 const userId = seat.currentOccupant;
-                const checkOutTime = now;
-                const durationMinutes = seat.occupiedSince ? Math.round((checkOutTime - seat.occupiedSince) / 60000) : 0;
+                const checkOutTime = now; // Force checkout at current time (or expected time?)
+
+                let durationMinutes = 0;
+                if (seat.occupiedSince) {
+                    durationMinutes = Math.round((checkOutTime - seat.occupiedSince) / 60000);
+                }
 
                 const bucketDate = new Date(seat.occupiedSince);
                 bucketDate.setHours(0, 0, 0, 0);
 
+                // Close attendance session
                 await Attendance.findOneAndUpdate(
                     {
                         userId,
@@ -385,9 +450,11 @@ const releaseExpiredSeats = async () => {
                     }
                 );
 
+                // Update User
                 await User.findByIdAndUpdate(userId, { 'studentDetails.assignedSeat': null });
                 authMiddleware.invalidateUserCache(userId);
 
+                // Reset Seat
                 seat.status = 'Available';
                 seat.currentOccupant = null;
                 seat.occupiedSince = null;
@@ -404,17 +471,16 @@ const releaseExpiredSeats = async () => {
 
     } catch (err) {
         console.error("Auto Release Logic Error:", err);
-        throw err;
+        throw err; // Re-throw to be caught by the route handler
     }
 };
 
-exports.releaseExpiredSeats = releaseExpiredSeats;
-exports.autoReleaseSeats = async (req, res) => {
+exports.releaseExpiredSeats = releaseExpiredSeats; // For Cron
+exports.autoReleaseSeats = async (req, res) => { // For Manual API Trigger
     try {
         const result = await releaseExpiredSeats();
         res.json({ success: true, ...result });
     } catch (err) {
-        console.error("Auto Release Error:", err);
         res.status(500).json({ message: "Auto release failed" });
     }
 };

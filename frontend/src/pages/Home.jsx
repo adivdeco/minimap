@@ -41,7 +41,7 @@ const Home = () => {
     const { user, logout, checkAuth } = useAuth();
     const { logout: auth0Logout } = useAuth0();
     const navigate = useNavigate();
-    
+
     const [showScanner, setShowScanner] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
     const [checkingOut, setCheckingOut] = useState(false);
@@ -53,16 +53,19 @@ const Home = () => {
     // Data Extraction
     const activeSeat = user?.studentDetails?.assignedSeat;
     const subscription = user?.studentDetails?.currentSubscription;
-    
+
     // Handle both populated object and raw ID safely
     const libraryId = subscription?.libraryId?._id || subscription?.libraryId;
     const libraryName = subscription?.libraryId?.libraryName;
     const libraryAddress = subscription?.libraryId?.location?.address;
 
-    // Plan Details Logic
-    const planDetails = subscription?.planId || subscription?.subscriptionId?.planId;
-    const planName = planDetails?.name || subscription?.planName || "Library Pass";
-    const totalDuration = planDetails?.durationInDays || 30;
+    const planDetails = subscription?.subscriptionId;
+
+
+    // Handle both direct population and nested population
+    const planName = planDetails?.planName || planDetails?.planId?.name;
+    const totalDuration = planDetails?.planId?.durationInDays || planDetails?.durationInDays || 30; // Default fallback to avoid NaN
+    const pricePaid = planDetails?.pricePaid;
 
     const expiryDate = subscription?.expiryDate ? new Date(subscription.expiryDate) : null;
     const startDate = subscription?.startDate ? new Date(subscription.startDate) : new Date();
@@ -95,7 +98,7 @@ const Home = () => {
             fetchSeats();
         }
         // Fix: Use primitive values in dependency array to avoid infinite loops
-    }, [libraryId, activeSeat?.seatNumber]); 
+    }, [libraryId, activeSeat?.seatNumber]);
 
     // --- Handlers ---
 
@@ -195,7 +198,7 @@ const Home = () => {
                                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all group"
                                     >
                                         <CalendarDays size={16} className="text-purple-400" />
-                                        <span className="text-sm font-medium text-gray-200">Attendance</span>
+                                        <span className="text-sm font-medium text-gray-500">Attendance</span>
                                     </button>
                                 )}
 
@@ -211,7 +214,7 @@ const Home = () => {
                                         </div>
                                     )}
                                     <div className="flex flex-col items-start leading-none gap-1">
-                                        <span className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors">
+                                        <span className="text-sm font-medium text-gray-500 group-hover:text-white transition-colors">
                                             {user?.name?.split(' ')[0]}
                                         </span>
                                         <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
@@ -354,25 +357,50 @@ const Home = () => {
 
                             {hasSubscription ? (
                                 <div className="flex-1 flex flex-col justify-between">
-                                    <div className="space-y-4">
-                                        <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5">
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Status</p>
-                                            <p className="text-green-600 dark:text-green-400 font-bold flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-green-500"></span> Active
-                                            </p>
-                                        </div>
-                                        <div className="p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5">
-                                            <div className="flex justify-between items-end mb-1">
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">Days Remaining</p>
-                                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{daysLeft} <span className="text-sm text-gray-400 font-normal">/ {totalDuration}</span></p>
+                                    <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-5 space-y-5">
+                                        {/* Top Row: Status & Price */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="relative flex h-2.5 w-2.5">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                                                </div>
+                                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Active Plan</span>
                                             </div>
-                                            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+                                            <div className="text-right">
+                                                <span className="block text-xs text-gray-400 uppercase font-bold tracking-wider">Price</span>
+                                                <span className="text-lg font-bold text-gray-900 dark:text-white">₹{pricePaid}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Divider */}
+                                        <div className="h-px bg-gray-200 dark:bg-white/10" />
+
+                                        {/* Bottom Row: Days & Progress */}
+                                        <div>
+                                            <div className="flex justify-between items-end mb-2">
+                                                <div>
+                                                    <span className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{daysLeft}</span>
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400 font-medium ml-1">days left</span>
+                                                </div>
+                                                <span className="text-xs text-gray-400 font-mono">{progressPercentage.toFixed(0)}% used</span>
+                                            </div>
+
+                                            {/* Progress Bar */}
+                                            <div className="relative w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${progressPercentage}%` }}
                                                     transition={{ duration: 1, ease: 'easeOut' }}
-                                                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                                                    className={`h-full rounded-full ${daysLeft < 3
+                                                        ? 'bg-red-500'
+                                                        : 'bg-gradient-to-r from-purple-500 to-indigo-500'
+                                                        }`}
                                                 />
+                                            </div>
+                                            <div className="flex justify-between mt-2 text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                                                <span>Started</span>
+                                                <span>{totalDuration} Days Total</span>
                                             </div>
                                         </div>
                                     </div>

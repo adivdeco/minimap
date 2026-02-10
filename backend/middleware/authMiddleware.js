@@ -67,6 +67,9 @@
 
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Subscription = require('../models/Subscription');
+const Plan = require('../models/Plan');
+const Library = require('../models/LibrarySchema'); // Ensure all models are registered
 const NodeCache = require('node-cache');
 
 // TTL: 60 seconds (Adjust based on how instant you want updates to be)
@@ -99,6 +102,7 @@ const authMiddleware = async (req, res, next) => {
                 .populate({
                     path: 'studentDetails.currentSubscription.subscriptionId',
                     model: 'Subscription',
+                    select: 'planId planName pricePaid status startDate expiryDate',
                     populate: {
                         path: 'planId',
                         model: 'Plan',
@@ -118,9 +122,9 @@ const authMiddleware = async (req, res, next) => {
         }
 
         // Standardize naming (optional: changed from req.finduser to req.user for convention)
-        req.user = finduser; 
+        req.user = finduser;
         req.finduser = finduser; // Kept for backward compatibility with your other controllers
-        
+
         next();
     } catch (err) {
         if (err.name === 'TokenExpiredError') {
@@ -133,7 +137,7 @@ const authMiddleware = async (req, res, next) => {
 
 // Exported method to clear cache (Use this in Login/Logout/Update controllers)
 authMiddleware.invalidateUserCache = (userId) => {
-    if(!userId) return;
+    if (!userId) return;
     const cacheKey = `user_${userId}`;
     userCache.del(cacheKey);
 };

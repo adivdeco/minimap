@@ -206,21 +206,29 @@ const SmartLibraryScanner = ({ onClose }) => {
         <p className="text-gray-500 dark:text-gray-400 mb-6 mt-2">{message}</p>
 
         {scanResult === 'SHOW_PLANS' && (
-          <div className="space-y-3 text-left">
-            <div className="border border-gray-200 dark:border-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer hover:border-blue-500 transition bg-white dark:bg-white/5">
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white">Daily Pass</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">24 Hours Access</p>
-              </div>
-              <span className="font-bold text-blue-600 dark:text-blue-400">₹50</span>
-            </div>
-            <div className="border p-4 rounded-lg flex justify-between items-center cursor-pointer border-blue-500 bg-blue-50 dark:bg-blue-900/20">
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white">Monthly Pass</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">30 Days Access</p>
-              </div>
-              <span className="font-bold text-blue-600 dark:text-blue-400">₹800</span>
-            </div>
+          <div className="space-y-3 text-left max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+            {data?.plans?.length > 0 ? (
+              data.plans.map((plan) => (
+                <div
+                  key={plan._id}
+                  className="border border-gray-200 dark:border-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer hover:border-blue-500 transition bg-white dark:bg-white/5"
+                  onClick={() => {
+                    // Placeholder for payment selection logic
+                    // setSelectedPlan(plan); 
+                    // console.log("Selected plan:", plan);
+                  }}
+                >
+                  <div>
+                    <p className="font-bold text-gray-900 dark:text-white">{plan.title}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{plan.durationInDays} Days Access • {plan.hoursPerDay}h/day</p>
+                  </div>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">₹{plan.price}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-gray-500">No public plans available.</p>
+            )}
+
             <button className="w-full bg-black dark:bg-white text-white dark:text-black py-3 rounded-lg font-bold mt-6 hover:opacity-80 transition">
               Proceed to Pay
             </button>
@@ -262,13 +270,6 @@ const SmartLibraryScanner = ({ onClose }) => {
           Scan QR Code
         </button>
 
-        {/* Debug Button (Optional) */}
-        <button
-          onClick={() => handleScan("valid_test_qr_string")}
-          className="text-gray-500 text-sm hover:text-white underline"
-        >
-          (Dev Only: Simulate Scan)
-        </button>
       </div>
     </div>
   );
