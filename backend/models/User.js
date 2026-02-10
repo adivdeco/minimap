@@ -71,7 +71,7 @@ const userSchema = new Schema({
         currentSubscription: {
             subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' }, // Direct link
             libraryId: { type: Schema.Types.ObjectId, ref: 'Library' },
-            planId: { type: Schema.Types.ObjectId },
+            planId: { type: Schema.Types.ObjectId, ref: 'Plan' },
             startDate: Date,
             expiryDate: Date,
             status: {

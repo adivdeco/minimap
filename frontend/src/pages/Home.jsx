@@ -11,7 +11,8 @@ import { toast } from 'react-toastify';
 import {
     LogOut, MapPin, Armchair, Library, QrCode,
     LayoutDashboard, Users, PlusCircle, BookOpen, CalendarDays,
-    ChevronRight, CreditCard, Clock, Sun, Moon
+    ChevronRight, CreditCard, Clock, Sun, Moon,
+    LibraryBig, X
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,6 +41,7 @@ const Home = () => {
     const { user, logout, checkAuth } = useAuth();
     const { logout: auth0Logout } = useAuth0();
     const navigate = useNavigate();
+    
     const [showScanner, setShowScanner] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
     const [checkingOut, setCheckingOut] = useState(false);
@@ -48,18 +50,19 @@ const Home = () => {
     const [seats, setSeats] = useState([]);
     const [loadingSeats, setLoadingSeats] = useState(false);
 
+    // Data Extraction
     const activeSeat = user?.studentDetails?.assignedSeat;
     const subscription = user?.studentDetails?.currentSubscription;
+    
     // Handle both populated object and raw ID safely
     const libraryId = subscription?.libraryId?._id || subscription?.libraryId;
     const libraryName = subscription?.libraryId?.libraryName;
+    const libraryAddress = subscription?.libraryId?.location?.address;
 
-    // Plan Details (Now populated with deep check)
-    // 1. Direct planId on user object
-    // 2. Deep populated via subscriptionId -> planId
+    // Plan Details Logic
     const planDetails = subscription?.planId || subscription?.subscriptionId?.planId;
     const planName = planDetails?.name || subscription?.planName || "Library Pass";
-    const totalDuration = planDetails?.durationInDays || 30; // Default fallback
+    const totalDuration = planDetails?.durationInDays || 30;
 
     const expiryDate = subscription?.expiryDate ? new Date(subscription.expiryDate) : null;
     const startDate = subscription?.startDate ? new Date(subscription.startDate) : new Date();
@@ -70,6 +73,9 @@ const Home = () => {
     const progressPercentage = Math.min(100, Math.max(0, (daysElapsed / totalDuration) * 100));
 
     const hasSubscription = !!subscription && subscription.status === 'active';
+    const isAdmin = user?.role === 'admin' || user?.role === 'co-admin';
+
+    // --- Effects ---
 
     useEffect(() => {
         const fetchSeats = async () => {
@@ -88,12 +94,15 @@ const Home = () => {
         if (libraryId) {
             fetchSeats();
         }
-    }, [libraryId, activeSeat]);
+        // Fix: Use primitive values in dependency array to avoid infinite loops
+    }, [libraryId, activeSeat?.seatNumber]); 
+
+    // --- Handlers ---
 
     const handleLogout = () => {
         logout();
         auth0Logout({ logoutParams: { returnTo: window.location.origin + '/login' } });
-        navigate('/login');
+        // Navigate is technically redundant here due to Auth0 redirect, but kept for safety
     };
 
     const handleCheckOut = async () => {
@@ -129,8 +138,6 @@ const Home = () => {
         }
     };
 
-    const isAdmin = user?.role === 'admin' || user?.role === 'co-admin';
-
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white selection:bg-purple-500/30 transition-colors duration-300">
 
@@ -148,7 +155,8 @@ const Home = () => {
                         <motion.div
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center gap-3"
+                            className="flex items-center gap-3 cursor-pointer"
+                            onClick={() => navigate('/')}
                         >
                             <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
                                 <Library className="text-white" size={20} />
@@ -198,7 +206,7 @@ const Home = () => {
                                     {user?.avatar ? (
                                         <img src={user.avatar} alt="Profile" className="w-8 h-8 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
                                     ) : (
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold shadow-inner">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold shadow-inner text-white">
                                             {user?.name?.charAt(0)?.toUpperCase()}
                                         </div>
                                     )}
@@ -213,9 +221,8 @@ const Home = () => {
                                 </button>
                             </div>
 
-                            {/* Mobile Profile */}
+                            {/* Mobile Profile & Theme */}
                             <div className="md:hidden flex items-center gap-3">
-                                {/* Theme Toggle Mobile */}
                                 <button
                                     onClick={toggleTheme}
                                     className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all"
@@ -234,8 +241,6 @@ const Home = () => {
                                 )}
                             </div>
                         </motion.div>
-
-
                     </div>
                 </div>
             </nav>
@@ -285,8 +290,12 @@ const Home = () => {
                                                 </h2>
                                             </div>
                                             <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                                                <MapPin size={16} className="text-purple-600 dark:text-purple-400" />
+                                                <LibraryBig size={16} className="text-purple-600 dark:text-purple-400" />
                                                 {libraryName || "Select a library to begin"}
+                                            </p>
+                                            <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                                <MapPin size={16} className="text-purple-600 dark:text-purple-400" />
+                                                {libraryAddress?.state ? `${libraryAddress.state}, ${libraryAddress.city}` : 'No location selected'}
                                             </p>
                                         </div>
                                     </div>
@@ -447,13 +456,13 @@ const Home = () => {
                                 />
                             )}
 
-                            {/* Generic fallback if no specific roles */}
+                            {/* Generic fallback for students */}
                             {!isAdmin && user?.role !== 'library_owner' && (
                                 <ActionCard
                                     icon={<CreditCard size={24} className="text-pink-600 dark:text-pink-400" />}
                                     title="History"
                                     subtitle="View past sessions"
-                                    onClick={() => navigate('/history')}
+                                    onClick={() => setShowAttendance(true)}
                                 />
                             )}
                         </div>
@@ -461,7 +470,7 @@ const Home = () => {
                 </motion.div>
             </main>
 
-            {/* Modal / Scanner Overlay */}
+            {/* Scanner Modal */}
             <AnimatePresence>
                 {showScanner && (
                     <motion.div
@@ -474,20 +483,22 @@ const Home = () => {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="w-full bg-[#18181b] border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+                            className="w-full bg-[#18181b] border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative"
                         >
-                            {/* <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#202025]">
-                                <h3 className="font-bold text-white">Scan QR Code</h3>
-                                <button onClick={() => setShowScanner(false)} className="text-gray-400 hover:text-white">Close</button>
-                            </div> */}
-                            <div className="p-1">
+                            {/* <button 
+                                onClick={() => setShowScanner(false)}
+                                className="absolute top-4 right-4 z-10 text-white bg-black/50 p-2 rounded-full hover:bg-black/80"
+                            >
+                                <X size={20} />
+                            </button> */}
+                            <div className="">
                                 <SmartLibraryScanner onClose={() => setShowScanner(false)} />
                             </div>
                         </motion.div>
                     </motion.div>
                 )}
 
-                {/* ATTENDANCE CALENDAR MODAL */}
+                {/* Attendance Modal */}
                 {showAttendance && hasSubscription && (
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -509,7 +520,8 @@ const Home = () => {
                                         onClick={() => setShowAttendance(false)}
                                         className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
                                     >
-                                        <LogOut size={20} className="text-gray-400" />
+                                        {/* Changed LogOut to X for clearer UI */}
+                                        <X size={20} className="text-gray-400" />
                                     </button>
                                 </div>
 
@@ -557,5 +569,3 @@ const ActionCard = ({ icon, title, subtitle, onClick }) => (
 );
 
 export default Home;
-
-
