@@ -13,6 +13,7 @@ import MyLibraries from './pages/MyLibraries'; // Owner view
 import EditLibrary from './pages/EditLibrary';
 import LibraryDetails from './pages/LibraryDetails';
 import Profile from './pages/Profile';
+import ManageUsers from './components/LibraryUsersManagement';
 import './index.css';
 
 // Auth0 configuration - Replace with your Auth0 credentials
@@ -47,6 +48,7 @@ function App() {
               <Route path="/my-libraries" element={<ProtectedRoute><MyLibraries /></ProtectedRoute>} />
               <Route path="/edit-library/:id" element={<ProtectedRoute><EditLibrary /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><AllUsers /></ProtectedRoute>} />
+              <Route path="/library/:id/users" element={<ProtectedRoute><ManageUsers /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

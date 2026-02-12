@@ -475,6 +475,15 @@ const Home = () => {
                                 />
                             )}
 
+                            {/* {user?.role === 'library_owner' && (
+                                <ActionCard
+                                    icon={<Users size={24} className="text-blue-600 dark:text-blue-400" />}
+                                    title="Manage Users"
+                                    subtitle="Manage library users"
+                                    onClick={() => navigate('/my-libraries')}
+                                />
+                            )} */}
+
                             {isAdmin && (
                                 <ActionCard
                                     icon={<Users size={24} className="text-yellow-600 dark:text-yellow-400" />}
