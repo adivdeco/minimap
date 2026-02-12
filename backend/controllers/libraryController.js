@@ -3,6 +3,8 @@ const Seat = require('../models/Seat');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const Subscription = require('../models/Subscription');
+const Attendance = require('../models/Attendance');
 
 // @desc    Add a new library (Admin/Co-Admin only)
 // @route   POST /api/library/add
@@ -726,14 +728,14 @@ const syncLibrarySeats = async (library) => {
     // 5. Execute Updates
     if (toInsert.length > 0) {
         await Seat.insertMany(toInsert);
-        console.log(`[Sync] Created ${toInsert.length} new seats for library ${library._id}`);
+        // console.log(`[Sync] Created ${toInsert.length} new seats for library ${library._id}`);
     }
 
     if (toDeleteIds.length > 0) {
         // Optional safety: only delete if status is 'Available' or force delete?
         // User expects capacity reduction -> deletion.
         await Seat.deleteMany({ _id: { $in: toDeleteIds } });
-        console.log(`[Sync] Deleted ${toDeleteIds.length} excess seats for library ${library._id}`);
+        // console.log(`[Sync] Deleted ${toDeleteIds.length} excess seats for library ${library._id}`);
     }
 
     // Existing seats remain untouched (preserving Occupied/Maintenance status)
@@ -760,6 +762,491 @@ const generateSeatsForLibrary = async (req, res) => {
     }
 };
 
+// ============================================
+// LIBRARY OWNER - USER ANALYTICS ENDPOINTS
+// ============================================
+
+
+const getLibraryUsers = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const role = req.finduser.role;
+        const { libraryId } = req.params;
+
+        // Find the library
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        // Permission check: Only library owner, admin, or co-admin can view users
+        const isOwner = library.ownerId.toString() === userId.toString();
+
+        if (role !== 'admin' && role !== 'co-admin' && !isOwner) {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to view library users"
+            });
+        }
+
+        // Pagination & Filtering
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const searchQuery = req.query.search || '';
+        const statusFilter = req.query.status; // 'active', 'expired', 'cancelled', 'all'
+        const sortBy = req.query.sortBy || 'createdAt'; // 'name', 'createdAt', 'lastSeen'
+        const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+
+        let subscriptionFilter = { libraryId };
+
+        if (statusFilter && statusFilter !== 'all') {
+            subscriptionFilter.status = statusFilter;
+        }
+
+        const subscriptions = await Subscription.find(subscriptionFilter)
+            .populate('userId', 'name email phone avatar createdAt');
+
+        if (!subscriptions || subscriptions.length === 0) {
+            return res.status(200).json({
+                message: "No users found for this library",
+                users: [],
+                summary: {
+                    totalUsers: 0,
+                    activeSubscriptions: 0,
+                    expiredSubscriptions: 0,
+                    cancelledSubscriptions: 0
+                },
+                pagination: {
+                    total: 0,
+                    totalPages: 0,
+                    currentPage: page,
+                    hasNextPage: false,
+                    hasPrevPage: false
+                }
+            });
+        }
+
+        // Filter out orphaned subscriptions (where userId is null due to deleted user)
+        const validSubscriptions = subscriptions.filter(sub => sub.userId);
+
+        // Extract unique user IDs and apply search filter
+        let userIds = validSubscriptions.map(sub => sub.userId._id);
+
+        if (searchQuery) {
+            const searchFilter = new RegExp(searchQuery, 'i');
+            const filteredSubs = validSubscriptions.filter(sub =>
+                searchFilter.test(sub.userId.name) ||
+                searchFilter.test(sub.userId.email)
+            );
+            userIds = filteredSubs.map(sub => sub.userId._id);
+        }
+
+        // If search filtered everything out
+        if (userIds.length === 0 && searchQuery) {
+            return res.status(200).json({
+                message: "No users matching search found",
+                users: [],
+                summary: {
+                    totalUsers: validSubscriptions.length,
+                    activeSubscriptions: validSubscriptions.filter(s => s.status === 'active').length,
+                    expiredSubscriptions: validSubscriptions.filter(s => s.status === 'expired').length,
+                    cancelledSubscriptions: validSubscriptions.filter(s => s.status === 'cancelled').length
+                },
+                pagination: {
+                    total: 0,
+                    totalPages: 0,
+                    currentPage: page,
+                    hasNextPage: false,
+                    hasPrevPage: false
+                }
+            });
+        }
+
+        // Get attendance summary for each user
+        const attendanceData = await Attendance.aggregate([
+            {
+                $match: {
+                    userId: { $in: userIds },
+                    libraryId: library._id
+                }
+            },
+            {
+                $group: {
+                    _id: '$userId',
+                    totalSessions: { $sum: '$sessionCount' },
+                    totalMinutes: { $sum: '$totalDurationToday' },
+                    lastVisit: { $max: '$date' },
+                    firstVisit: { $min: '$date' }
+                }
+            }
+        ]);
+
+        // Convert to map for easy lookup
+        const attendanceMap = new Map();
+        attendanceData.forEach(record => {
+            attendanceMap.set(record._id.toString(), record);
+        });
+
+        // Prepare detailed user data
+        // Only process subs that match the search (if any)
+        const relevantSubs = validSubscriptions.filter(sub =>
+            userIds.some(uid => uid.toString() === sub.userId._id.toString())
+        );
+
+        let usersData = relevantSubs.map(sub => {
+            const attendance = attendanceMap.get(sub.userId._id.toString()) || {
+                totalSessions: 0,
+                totalMinutes: 0
+            };
+
+            // Find the plan name from library plans
+            // sub.planId might be a string or ObjectId
+            const planDetails = library.plans.find(p => p._id.toString() === sub.planId.toString());
+
+            return {
+                userId: sub.userId._id,
+                userName: sub.userId.name,
+                email: sub.userId.email,
+                phone: sub.userId.phone || 'N/A',
+                avatar: sub.userId.avatar || '',
+                subscription: {
+                    subscriptionId: sub._id,
+                    planName: sub.planName || planDetails?.name || 'Unknown Plan',
+                    planId: sub.planId,
+                    startDate: sub.startDate,
+                    expiryDate: sub.expiryDate,
+                    status: sub.status,
+                    pricePaid: sub.pricePaid
+                },
+                attendance: {
+                    totalSessions: attendance.totalSessions || 0,
+                    totalMinutesUsed: attendance.totalMinutes || 0,
+                    totalHoursUsed: Math.round((attendance.totalMinutes || 0) / 60 * 100) / 100,
+                    firstVisit: attendance.firstVisit || null,
+                    lastVisit: attendance.lastVisit || null
+                },
+                joinedAt: sub.userId.createdAt
+            };
+        });
+
+        // Apply sorting
+        usersData.sort((a, b) => {
+            let compareValue = 0;
+
+            if (sortBy === 'name') {
+                compareValue = a.userName.localeCompare(b.userName);
+            } else if (sortBy === 'createdAt') {
+                const dateA = new Date(a.joinedAt || 0);
+                const dateB = new Date(b.joinedAt || 0);
+                compareValue = dateA - dateB;
+            } else if (sortBy === 'lastSeen') {
+                const dateA = a.attendance.lastVisit ? new Date(a.attendance.lastVisit) : new Date(0);
+                const dateB = b.attendance.lastVisit ? new Date(b.attendance.lastVisit) : new Date(0);
+                compareValue = dateA - dateB;
+            } else if (sortBy === 'sessionsCount') {
+                compareValue = a.attendance.totalSessions - b.attendance.totalSessions;
+            }
+
+            return compareValue * sortOrder;
+        });
+
+        const total = usersData.length;
+        const paginatedUsers = usersData.slice(skip, skip + limit);
+
+        res.status(200).json({
+            message: "Users retrieved successfully",
+            users: paginatedUsers,
+            summary: {
+                totalUsers: total,
+                activeSubscriptions: validSubscriptions.filter(s => s.status === 'active').length,
+                expiredSubscriptions: validSubscriptions.filter(s => s.status === 'expired').length,
+                cancelledSubscriptions: validSubscriptions.filter(s => s.status === 'cancelled').length
+            },
+            pagination: {
+                total,
+                totalPages: Math.ceil(total / limit),
+                currentPage: page,
+                hasNextPage: page * limit < total,
+                hasPrevPage: page > 1
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching library users:', error);
+        res.status(500).json({
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get detailed analytics for a specific user in library
+// @route   GET /api/library/:libraryId/user/:userId/analytics
+const getUserAnalytics = async (req, res) => {
+    try {
+        const ownerId = req.finduser._id;
+        const ownerRole = req.finduser.role;
+        const { libraryId, userId } = req.params;
+
+        // Verify library ownership
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        const isOwner = library.ownerId.toString() === ownerId.toString();
+        if (ownerRole !== 'admin' && ownerRole !== 'co-admin' && !isOwner) {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to view user analytics"
+            });
+        }
+
+        // Fetch user data
+        const user = await User.findById(userId).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Fetch subscription data
+        const Subscription = require('../models/Subscription');
+        const subscription = await Subscription.findOne({
+            userId,
+            libraryId
+        });
+
+        if (!subscription) {
+            return res.status(404).json({
+                message: "This user has no subscription in this library"
+            });
+        }
+
+        // Fetch all attendance records for this user
+        const Attendance = require('../models/Attendance');
+        const attendanceRecords = await Attendance.find({
+            userId,
+            libraryId
+        }).sort({ date: -1 });
+
+        // Calculate analytics
+        const totalSessions = attendanceRecords.reduce((acc, record) => acc + record.sessionCount, 0);
+        const totalMinutes = attendanceRecords.reduce((acc, record) => acc + (record.totalDurationToday || 0), 0);
+        const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+
+        // Average session duration
+        const avgSessionDuration = totalSessions > 0 ? Math.round((totalMinutes / totalSessions) * 100) / 100 : 0;
+
+        // Get latest 10 sessions
+        const detailedSessions = [];
+        attendanceRecords.forEach(record => {
+            record.sessions.forEach(session => {
+                if (session.checkOutTime) {
+                    detailedSessions.push({
+                        date: record.date,
+                        seatNumber: session.seatNumber,
+                        checkInTime: session.checkInTime,
+                        checkOutTime: session.checkOutTime,
+                        durationMinutes: session.durationMinutes
+                    });
+                }
+            });
+        });
+
+        // Sort by date descending and take latest 10
+        const latestSessions = detailedSessions
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 10);
+
+        // Plan details
+        const planDetails = library.plans.find(p => p._id.toString() === subscription.planId.toString());
+
+        res.status(200).json({
+            message: "User analytics retrieved successfully",
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone || 'N/A',
+                avatar: user.avatar || '',
+                joinedAt: user.createdAt
+            },
+            subscription: {
+                planName: subscription.planName,
+                planId: subscription.planId,
+                startDate: subscription.startDate,
+                expiryDate: subscription.expiryDate,
+                status: subscription.status,
+                pricePaid: subscription.pricePaid,
+                daysRemaining: subscription.status === 'active'
+                    ? Math.ceil((new Date(subscription.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
+                    : 0
+            },
+            planDetails: {
+                name: planDetails?.name || 'Unknown',
+                hoursPerDay: planDetails?.hoursPerDay || 5,
+                totalDays: planDetails?.totalDays || 30,
+                price: planDetails?.price || 0
+            },
+            analytics: {
+                totalSessions,
+                totalMinutesUsed: totalMinutes,
+                totalHoursUsed: totalHours,
+                averageSessionDuration: avgSessionDuration,
+                totalVisitDays: attendanceRecords.length,
+                firstVisit: attendanceRecords.length > 0 ? attendanceRecords[attendanceRecords.length - 1].date : null,
+                lastVisit: attendanceRecords.length > 0 ? attendanceRecords[0].date : null
+            },
+            recentSessions: latestSessions,
+            allAttendance: attendanceRecords.map(record => ({
+                date: record.date,
+                sessionCount: record.sessionCount,
+                totalDurationMinutes: record.totalDurationToday,
+                sessions: record.sessions
+            }))
+        });
+
+    } catch (error) {
+        console.error('Error fetching user analytics:', error);
+        res.status(500).json({
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get library statistics and insights
+// @route   GET /api/library/:libraryId/statistics
+const getLibraryStatistics = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const role = req.finduser.role;
+        const { libraryId } = req.params;
+
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        const isOwner = library.ownerId.toString() === userId.toString();
+        if (role !== 'admin' && role !== 'co-admin' && !isOwner) {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to library statistics"
+            });
+        }
+
+        const Subscription = require('../models/Subscription');
+        const Attendance = require('../models/Attendance');
+
+        // Get all subscriptions
+        const allSubscriptions = await Subscription.find({ libraryId });
+
+        // Get today's attendance
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const todayAttendance = await Attendance.find({
+            libraryId,
+            date: today
+        });
+
+        // Get last 30 days attendance
+        const last30Days = new Date();
+        last30Days.setDate(last30Days.getDate() - 30);
+        last30Days.setHours(0, 0, 0, 0);
+
+        const last30DaysAttendance = await Attendance.find({
+            libraryId,
+            date: { $gte: last30Days }
+        });
+
+        // Calculate metrics
+        const activeSubscriptions = allSubscriptions.filter(s => s.status === 'active').length;
+        const expiredSubscriptions = allSubscriptions.filter(s => s.status === 'expired').length;
+        const cancelledSubscriptions = allSubscriptions.filter(s => s.status === 'cancelled').length;
+
+        const totalRevenue = allSubscriptions.reduce((acc, sub) => acc + (sub.pricePaid || 0), 0);
+
+        const todayVisitors = new Set(todayAttendance.map(a => a.userId.toString())).size;
+        const todaySessions = todayAttendance.reduce((acc, record) => acc + record.sessionCount, 0);
+
+        const last30DaysUniqueUsers = new Set(last30DaysAttendance.map(a => a.userId.toString())).size;
+        const last30DaysSessions = last30DaysAttendance.reduce((acc, record) => acc + record.sessionCount, 0);
+        const last30DaysMinutes = last30DaysAttendance.reduce((acc, record) => acc + (record.totalDurationToday || 0), 0);
+
+        // Revenue trend - last 30 days
+        const revenueByDate = {};
+        allSubscriptions.forEach(sub => {
+            const date = new Date(sub.startDate);
+            date.setHours(0, 0, 0, 0);
+            const dateKey = date.toISOString().split('T')[0];
+
+            if (!revenueByDate[dateKey]) {
+                revenueByDate[dateKey] = 0;
+            }
+            revenueByDate[dateKey] += sub.pricePaid || 0;
+        });
+
+        // Get average rating
+        const avgRating = library.rating?.averageRating || 0;
+        const totalReviews = library.rating?.reviews?.length || 0;
+
+        res.status(200).json({
+            message: "Library statistics retrieved successfully",
+            library: {
+                _id: library._id,
+                name: library.libraryName,
+                totalSeats: library.totalSeats,
+                rating: avgRating,
+                totalReviews
+            },
+            subscriptionMetrics: {
+                totalSubscriptions: allSubscriptions.length,
+                activeSubscriptions,
+                expiredSubscriptions,
+                cancelledSubscriptions,
+                conversionRate: allSubscriptions.length > 0
+                    ? `${Math.round((activeSubscriptions / allSubscriptions.length) * 100)}%`
+                    : '0%'
+            },
+            financialMetrics: {
+                totalRevenue,
+                averageRevenuePerSubscription: allSubscriptions.length > 0
+                    ? Math.round((totalRevenue / allSubscriptions.length) * 100) / 100
+                    : 0
+            },
+            attendanceMetrics: {
+                today: {
+                    visitors: todayVisitors,
+                    sessions: todaySessions
+                },
+                last30Days: {
+                    uniqueUsers: last30DaysUniqueUsers,
+                    totalSessions: last30DaysSessions,
+                    totalMinutesUsed: last30DaysMinutes,
+                    totalHoursUsed: Math.round((last30DaysMinutes / 60) * 100) / 100,
+                    averageSessionDuration: last30DaysSessions > 0
+                        ? Math.round((last30DaysMinutes / last30DaysSessions) * 100) / 100
+                        : 0
+                }
+            },
+            revenueByDate: Object.entries(revenueByDate)
+                .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+                .slice(0, 30)
+                .reduce((acc, [date, revenue]) => {
+                    acc[date] = revenue;
+                    return acc;
+                }, {})
+        });
+
+    } catch (error) {
+        console.error('Error fetching library statistics:', error);
+        res.status(500).json({
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     addLibrary,
     updateLibrary,
@@ -772,5 +1259,8 @@ module.exports = {
     rateLibrary,
     deleteReview,
     regenerateQRCode,
-    generateSeatsForLibrary
+    generateSeatsForLibrary,
+    getLibraryUsers,
+    getUserAnalytics,
+    getLibraryStatistics
 };

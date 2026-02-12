@@ -12,7 +12,10 @@ const {
     rateLibrary,
     deleteReview,
     regenerateQRCode,
-    generateSeatsForLibrary
+    generateSeatsForLibrary,
+    getLibraryUsers,
+    getUserAnalytics,
+    getLibraryStatistics
 } = require('../controllers/libraryController');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -30,8 +33,13 @@ router.post('/rate/:id', authMiddleware, rateLibrary);
 router.delete('/review/:libraryId/:reviewId', authMiddleware, deleteReview);
 router.patch('/regenerate-qr/:id', authMiddleware, regenerateQRCode);
 
-//owner routes
+// Owner routes
 router.get('/owner/my-libraries', authMiddleware, getMyLibraries);
 router.post('/generate-seats', authMiddleware, generateSeatsForLibrary);
+
+// Library Owner - User & Analytics Routes
+router.get('/:libraryId/users', authMiddleware, getLibraryUsers);
+router.get('/:libraryId/user/:userId/analytics', authMiddleware, getUserAnalytics);
+router.get('/:libraryId/statistics', authMiddleware, getLibraryStatistics);
 
 module.exports = router;

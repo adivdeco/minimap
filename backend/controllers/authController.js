@@ -7,13 +7,16 @@ const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 const JWT_EXPIRY = 60 * 60 * 24 * 7; // ~16 days
 
 // Cookie options
-const getCookieOptions = () => ({
-    maxAge: JWT_EXPIRY * 1000,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-    path: '/'
-});
+// Cookie options
+const getCookieOptions = () => {
+    return {
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+        path: '/'
+    };
+};
 
 // @desc    Register new user
 // @route   POST /api/auth/register
@@ -46,7 +49,9 @@ const registerUser = async (req, res) => {
             { expiresIn: JWT_EXPIRY }
         );
 
-        res.cookie('token', token, getCookieOptions());
+        // Cookie options
+        const options = getCookieOptions();
+        res.cookie('token', token, options);
 
         res.status(200).json({
             user: {
@@ -115,7 +120,8 @@ const loginUser = async (req, res) => {
             { expiresIn: JWT_EXPIRY }
         );
 
-        res.cookie('token', token, getCookieOptions());
+        const options = getCookieOptions();
+        res.cookie('token', token, options);
 
         res.status(200).json({
             success: true,
@@ -179,7 +185,8 @@ const socialLogin = async (req, res) => {
             { expiresIn: JWT_EXPIRY }
         );
 
-        res.cookie('token', token, getCookieOptions());
+        const options = getCookieOptions();
+        res.cookie('token', token, options);
 
         res.status(200).json({
             success: true,
@@ -217,24 +224,26 @@ const logoutUser = async (req, res) => {
     }
 };
 
-// @desc    Check session / Get current user
+// @desc    Check if user is logged in
 // @route   GET /api/auth/check-session
 const checkSession = async (req, res) => {
     try {
-        const user = req.finduser;
         const token = req.cookies.token;
 
-        if (!user) {
-            return res.status(401).json({ message: "Not logged in" });
+        if (!token) {
+            return res.status(200).json({ user: null });
         }
 
-        res.status(200).json({
-            message: "Valid user",
-            user,
-            token
-        });
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await User.findById(decoded.userId).select('-password');
+
+        if (!user) {
+            return res.status(200).json({ user: null });
+        }
+
+        res.status(200).json({ user });
     } catch (error) {
-        res.status(500).json({ message: "Server error" });
+        res.status(200).json({ user: null });
     }
 };
 
