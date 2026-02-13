@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { checkIn, checkOut, autoReleaseSeats, activateTrial, getAttendanceHistory } = require('../controllers/entryController');
+const { checkIn, checkOut, autoReleaseSeats, activateTrial, getAttendanceHistory, activateSubscriptionOffline } = require('../controllers/entryController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 // @route   POST /api/entry/check-in
@@ -22,6 +22,11 @@ router.post('/auto-release', autoReleaseSeats);
 // @desc    Activate a free trial plan
 // @access  Private (User)
 router.post('/activate-trial', authMiddleware, activateTrial);
+
+// @route   POST /api/entry/activate-subscription-offline
+// @desc    Admin/Owner manually activates subscription for user (Offline Payment - Cash)
+// @access  Private (Admin or Library Owner)
+router.post('/activate-subscription-offline', authMiddleware, activateSubscriptionOffline);
 
 // @route   GET /api/entry/history
 // @desc    Get user attendance history

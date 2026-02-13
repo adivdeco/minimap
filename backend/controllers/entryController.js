@@ -505,3 +505,128 @@ exports.getAttendanceHistory = async (req, res) => {
         res.status(500).json({ success: false, msg: "Failed to fetch history" });
     }
 };
+
+// ==========================================
+// 5. OFFLINE PAYMENT - MANUAL SUBSCRIPTION ACTIVATION
+// ==========================================
+// @desc    Admin/Owner manually activates subscription for a user (Offline Payment)
+// @route   POST /api/entry/activate-subscription-offline
+// @access  Private (Admin/Library Owner)
+exports.activateSubscriptionOffline = async (req, res) => {
+    try {
+        const { userId, libraryId, planId, pricePaid, startDate } = req.body;
+        const adminId = req.finduser._id;
+        const adminRole = req.finduser.role;
+
+        // Validation: Required fields
+        if (!userId || !libraryId || !planId) {
+            return res.status(400).json({
+                success: false,
+                msg: "Missing required fields: userId, libraryId, planId"
+            });
+        }
+
+        // Get Library to verify ownership
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ success: false, msg: "Library not found" });
+        }
+
+        // Authorization: Only Admin or Library Owner can do this
+        const isAdmin = adminRole === 'admin' || adminRole === 'co-admin';
+        const isLibraryOwner = adminRole === 'library_owner' &&
+            library.ownerId.toString() === adminId.toString();
+
+        if (!isAdmin && !isLibraryOwner) {
+            return res.status(403).json({
+                success: false,
+                msg: "Only admin or library owner can activate subscriptions"
+            });
+        }
+
+        // Verify User exists
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, msg: "User not found" });
+        }
+
+        // Find Plan (Embedded or Standalone)
+        const plan = await resolvePlan(planId, library);
+        if (!plan) {
+            return res.status(404).json({ success: false, msg: "Plan not found" });
+        }
+
+        // Check if user already has active subscription for this library
+        const existingActiveSub = await Subscription.findOne({
+            userId,
+            libraryId,
+            status: 'active',
+            expiryDate: { $gt: new Date() }
+        });
+
+        if (existingActiveSub) {
+            return res.status(400).json({
+                success: false,
+                msg: "User already has an active subscription for this library"
+            });
+        }
+
+        // Calculate Expiry Date
+        const subStartDate = startDate ? new Date(startDate) : new Date();
+        const expiryDate = new Date(subStartDate);
+        expiryDate.setDate(expiryDate.getDate() + plan.durationInDays);
+
+        // Create Subscription
+        const newSub = await Subscription.create({
+            userId,
+            libraryId,
+            planId: plan._id,
+            planName: plan.name || plan.title,
+            pricePaid: pricePaid || plan.price || 0, // Store actual price paid
+            startDate: subStartDate,
+            expiryDate: expiryDate,
+            status: 'active',
+            paymentId: `OFFLINE-${Date.now()}` // Track as offline payment
+        });
+
+        // Update user's subscription info in studentDetails
+        await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    'studentDetails.currentSubscription': {
+                        subscriptionId: newSub._id,
+                        libraryId: library._id,
+                        planId: plan._id,
+                        startDate: subStartDate,
+                        expiryDate: expiryDate,
+                        status: 'active'
+                    }
+                }
+            },
+            { new: true }
+        );
+
+        return res.status(201).json({
+            success: true,
+            msg: "Subscription activated successfully (Offline Payment)",
+            subscription: {
+                _id: newSub._id,
+                userId,
+                libraryId,
+                planName: newSub.planName,
+                pricePaid: newSub.pricePaid,
+                startDate: newSub.startDate,
+                expiryDate: newSub.expiryDate,
+                status: newSub.status
+            }
+        });
+
+    } catch (err) {
+        console.error("Activate Subscription Offline Error:", err);
+        res.status(500).json({
+            success: false,
+            msg: "Failed to activate subscription"
+        });
+    }
+};
