@@ -76,10 +76,10 @@ const MyLibraries = () => {
             <Navbar />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
-                
+
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5 }}
@@ -92,7 +92,7 @@ const MyLibraries = () => {
                         </p>
                     </motion.div>
 
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5 }}
@@ -108,7 +108,7 @@ const MyLibraries = () => {
                 </div>
 
                 {error && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="mb-8 p-4 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl flex items-center gap-3 text-sm font-medium"
@@ -128,7 +128,7 @@ const MyLibraries = () => {
 
                 {/* Empty State */}
                 {!loading && libraries.length === 0 && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="text-center py-24 bg-white dark:bg-white/5 rounded-3xl border border-dashed border-gray-300 dark:border-white/10"
@@ -138,9 +138,9 @@ const MyLibraries = () => {
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No libraries assigned</h3>
                         <p className="text-gray-500 dark:text-gray-400 mb-6">You haven't been assigned any libraries yet.</p>
-                        <button 
-                             onClick={() => navigate('/add-library')}
-                             className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+                        <button
+                            onClick={() => navigate('/add-library')}
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
                         >
                             Register New Library
                         </button>
@@ -149,7 +149,7 @@ const MyLibraries = () => {
 
                 {/* Libraries Grid */}
                 {!loading && libraries.length > 0 && (
-                    <motion.div 
+                    <motion.div
                         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-10"
                         variants={gridContainerVariants}
                         initial="hidden"
@@ -182,7 +182,7 @@ const MyLibraries = () => {
                                             {lib.isActive ? 'ONLINE' : 'OFFLINE'}
                                         </div>
                                     </div>
-                                    
+
                                     {/* View Overlay */}
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
                                         <div className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl text-white font-medium text-sm flex items-center gap-2">
@@ -238,7 +238,16 @@ const MyLibraries = () => {
                                             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
                                         >
                                             <Users size={18} />
-                                            <span>Manage Users & Subs</span>
+                                            <span>All Users & Subs</span>
+                                            <ArrowUpRight size={16} className="opacity-60" />
+                                        </button>
+
+                                        <button
+                                            onClick={() => navigate(`/library/${lib._id}/admin`)}
+                                            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+                                        >
+                                            <Users size={18} />
+                                            <span>Edit Subs</span>
                                             <ArrowUpRight size={16} className="opacity-60" />
                                         </button>
 
@@ -255,7 +264,7 @@ const MyLibraries = () => {
                                                 className={`py-2.5 border font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm ${lib.isActive
                                                     ? 'border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
                                                     : 'border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10'
-                                                }`}
+                                                    }`}
                                             >
                                                 <Power size={16} />
                                                 {lib.isActive ? 'Go Offline' : 'Go Online'}

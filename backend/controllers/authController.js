@@ -84,7 +84,20 @@ const loginUser = async (req, res) => {
         }
 
         // IMPORTANT: Must select('+password') because password has select: false in schema
-        const user = await User.findOne({ email }).select('+password');
+        const user = await User.findOne({ email }).select('+password')
+            .populate({
+                path: 'studentDetails.currentSubscription.libraryId',
+                select: 'libraryName location'
+            })
+            .populate({
+                path: 'studentDetails.currentSubscription.subscriptionId',
+                select: 'planId planName pricePaid status startDate expiryDate',
+                populate: {
+                    path: 'planId',
+                    model: 'Plan',
+                    select: 'name durationInDays'
+                }
+            });
 
         if (!user) {
             return res.status(401).json({
@@ -131,6 +144,7 @@ const loginUser = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 avatar: user.avatar || '',
+                studentDetails: user.studentDetails,
                 createdAt: user.createdAt
             },
             message: "Login successful"
@@ -235,7 +249,21 @@ const checkSession = async (req, res) => {
         }
 
         const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await User.findById(decoded.userId).select('-password');
+        const user = await User.findById(decoded.userId)
+            .select('-password')
+            .populate({
+                path: 'studentDetails.currentSubscription.libraryId',
+                select: 'libraryName location'
+            })
+            .populate({
+                path: 'studentDetails.currentSubscription.subscriptionId',
+                select: 'planId planName pricePaid status startDate expiryDate',
+                populate: {
+                    path: 'planId',
+                    model: 'Plan',
+                    select: 'name durationInDays'
+                }
+            });
 
         if (!user) {
             return res.status(200).json({ user: null });
@@ -332,14 +360,10 @@ const updateUser = async (req, res) => {
 
             // Helper to flatten specifically for this known structure
             if (details.currentSubscription) {
-                for (const [key, value] of Object.entries(details.currentSubscription)) {
-                    updateData[`studentDetails.currentSubscription.${key}`] = value;
-                }
+                updateData['studentDetails.currentSubscription'] = details.currentSubscription;
             }
             if (details.assignedSeat) {
-                for (const [key, value] of Object.entries(details.assignedSeat)) {
-                    updateData[`studentDetails.assignedSeat.${key}`] = value;
-                }
+                updateData['studentDetails.assignedSeat'] = details.assignedSeat;
             }
         }
 

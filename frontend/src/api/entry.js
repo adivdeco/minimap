@@ -35,3 +35,15 @@ export const getAttendanceHistory = async () => {
     return response.data;
 };
 
+// Activate Subscription Offline (Admin/Owner only)
+export const activateSubscriptionOffline = async (userId, libraryId, planId, pricePaid = 0, startDate = null) => {
+    const response = await api.post('/entry/activate-subscription-offline', {
+        userId,
+        libraryId,
+        planId,
+        pricePaid,
+        startDate
+    });
+    return response.data;
+};
+

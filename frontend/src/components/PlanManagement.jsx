@@ -107,11 +107,11 @@ const PlanManagement = ({ libraryId }) => {
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-800">Membership Plans</h2>
-                    <p className="text-sm text-gray-500">Manage pricing and subscription options</p>
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">Membership Plans</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Manage pricing and subscription options</p>
                 </div>
                 <button
                     onClick={() => openModal()}
@@ -124,13 +124,13 @@ const PlanManagement = ({ libraryId }) => {
             {loading ? (
                 <div className="p-8 text-center text-gray-500">Loading plans...</div>
             ) : plans.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <div className="p-8 text-center text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-700 rounded-xl border border-dashed border-gray-200 dark:border-gray-600">
                     No plans created yet. Add one to start selling subscriptions.
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {plans.map(plan => (
-                        <div key={plan._id} className="border border-gray-200 rounded-xl p-5 hover:border-purple-200 transition-all relative group">
+                        <div key={plan._id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 hover:border-purple-200 dark:hover:border-purple-500 transition-all relative group">
                             {plan.isPopular && (
                                 <div className="absolute top-0 right-0 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">
                                     POPULAR
@@ -142,7 +142,7 @@ const PlanManagement = ({ libraryId }) => {
                                 </div>
                             )}
                             <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-bold text-lg text-gray-900">{plan.name}</h3>
+                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">{plan.name}</h3>
                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => openModal(plan)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
                                         <Edit2 size={16} />
@@ -154,14 +154,14 @@ const PlanManagement = ({ libraryId }) => {
                             </div>
                             <div className="text-2xl font-bold text-purple-600 mb-1 flex items-baseline gap-2">
                                 ₹{plan.price}
-                                <span className="text-sm text-gray-500 font-normal">
+                                <span className="text-sm text-gray-500 dark:text-gray-400 font-normal">
                                     / {plan.durationInDays} days • {plan.hoursPerDay || 24}h/day
                                 </span>
                             </div>
-                            <p className="text-sm text-gray-600 mb-3">{plan.description}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{plan.description}</p>
                             <div className="space-y-1">
                                 {plan.features.slice(0, 3).map((feat, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-xs text-gray-500">
+                                    <div key={i} className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                                         <Check size={12} className="text-green-500" /> {feat}
                                     </div>
                                 ))}
@@ -174,9 +174,9 @@ const PlanManagement = ({ libraryId }) => {
             {/* MODAL */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-800">
+                            <h3 className="text-xl font-bold text-gray-800 dark:text-white">
                                 {editingPlan ? 'Edit Plan' : 'New Plan'}
                             </h3>
                             <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
@@ -186,11 +186,11 @@ const PlanManagement = ({ libraryId }) => {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Plan Name</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Plan Name</label>
                                 <input
                                     type="text"
                                     required
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                     placeholder="e.g. Monthly Pro"
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -199,23 +199,23 @@ const PlanManagement = ({ libraryId }) => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price (₹)</label>
                                     <input
                                         type="number"
                                         required
                                         min="0"
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                         value={formData.price}
                                         onChange={e => setFormData({ ...formData, price: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Duration (Days)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration (Days)</label>
                                     <input
                                         type="number"
                                         required
                                         min="1"
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                         value={formData.durationInDays}
                                         onChange={e => setFormData({ ...formData, durationInDays: e.target.value })}
                                     />
@@ -224,24 +224,24 @@ const PlanManagement = ({ libraryId }) => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Hours/Day</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hours/Day</label>
                                     <input
                                         type="number"
                                         required
                                         min="1"
                                         max="24"
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                         placeholder="24"
                                         value={formData.hoursPerDay}
                                         onChange={e => setFormData({ ...formData, hoursPerDay: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Trial Days</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trial Days</label>
                                     <input
                                         type="number"
                                         min="0"
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                         placeholder="0 for no trial"
                                         value={formData.trialDays}
                                         onChange={e => setFormData({ ...formData, trialDays: e.target.value })}
@@ -250,10 +250,10 @@ const PlanManagement = ({ libraryId }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Features (comma separated)</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Features (comma separated)</label>
                                 <input
                                     type="text"
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                                     placeholder="AC, WiFi, Locker"
                                     value={formData.features}
                                     onChange={e => setFormData({ ...formData, features: e.target.value })}
@@ -268,7 +268,7 @@ const PlanManagement = ({ libraryId }) => {
                                     onChange={e => setFormData({ ...formData, isPopular: e.target.checked })}
                                     className="rounded text-purple-600 focus:ring-purple-500"
                                 />
-                                <label htmlFor="isPopular" className="text-sm text-gray-700 select-none">Mark as Popular / Recommended</label>
+                                <label htmlFor="isPopular" className="text-sm text-gray-700 dark:text-gray-300 select-none">Mark as Popular / Recommended</label>
                             </div>
 
                             <button

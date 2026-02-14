@@ -189,60 +189,108 @@ const SmartLibraryScanner = ({ onClose }) => {
 
   // 5. PAYMENT / ERROR SCREEN
   if (scanResult === 'SHOW_PLANS' || scanResult === 'ERROR') return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-[#050505] p-6 relative transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Dynamic Background with Blur */}
+      <div
+        className={`absolute inset-0 transition-colors duration-500 ${scanResult === 'ERROR'
+            ? 'bg-red-900/20 backdrop-blur-md'
+            : 'bg-black/60 backdrop-blur-md'
+          }`}
+      />
+
       <CloseButton />
-      <div className="bg-white dark:bg-[#0F0F12] p-6 rounded-2xl shadow-xl w-full max-w-md text-center border border-gray-200 dark:border-white/10">
 
-        {scanResult === 'ERROR' ? (
-          <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-        ) : (
-          <CreditCard size={48} className="mx-auto text-blue-500 mb-4" />
-        )}
+      <div className="relative w-full max-w-md transforms transition-all">
+        <div className="bg-white dark:bg-[#121214] rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5">
 
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-          {scanResult === 'ERROR' ? "Access Denied" : "Subscription Required"}
-        </h2>
+          {/* Header Section */}
+          <div className={`p-8 pb-6 text-center border-b border-gray-100 dark:border-white/5 ${scanResult === 'ERROR' ? 'bg-red-50/50 dark:bg-red-500/5' : 'bg-blue-50/50 dark:bg-blue-500/5'
+            }`}>
+            <div className={`mx-auto w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-lg transform rotate-3 transition-transform hover:rotate-0 ${scanResult === 'ERROR'
+                ? 'bg-gradient-to-tr from-red-500 to-pink-600 text-white shadow-red-500/30'
+                : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-blue-500/30'
+              }`}>
+              {scanResult === 'ERROR' ? (
+                <AlertCircle size={40} className="drop-shadow-md" />
+              ) : (
+                <CreditCard size={40} className="drop-shadow-md" />
+              )}
+            </div>
 
-        <p className="text-gray-500 dark:text-gray-400 mb-6 mt-2">{message}</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
+              {scanResult === 'ERROR' ? "Access Denied" : "Subscription Required"}
+            </h2>
 
-        {scanResult === 'SHOW_PLANS' && (
-          <div className="space-y-3 text-left max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-            {data?.plans?.length > 0 ? (
-              data.plans.map((plan) => (
-                <div
-                  key={plan._id}
-                  className="border border-gray-200 dark:border-white/10 p-4 rounded-lg flex justify-between items-center cursor-pointer hover:border-blue-500 transition bg-white dark:bg-white/5"
-                  onClick={() => {
-                    // Placeholder for payment selection logic
-                    // setSelectedPlan(plan); 
-                    // console.log("Selected plan:", plan);
-                  }}
-                >
-                  <div>
-                    <p className="font-bold text-gray-900 dark:text-white">{plan.title}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{plan.durationInDays} Days Access • {plan.hoursPerDay}h/day</p>
-                  </div>
-                  <span className="font-bold text-blue-600 dark:text-blue-400">₹{plan.price}</span>
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium px-4">
+              {message || (scanResult === 'ERROR' ? "Please try scanning again." : "Choose a plan to continue accessing the library.")}
+            </p>
+          </div>
+
+          {/* Content Section */}
+          <div className="p-6">
+            {scanResult === 'SHOW_PLANS' && (
+              <div className="space-y-4">
+                <div className="max-h-[320px] overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                  {data?.plans?.length > 0 ? (
+                    data.plans.map((plan) => (
+                      <div
+                        key={plan._id}
+                        className="group relative border border-gray-200 dark:border-white/10 p-4 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-300 bg-gray-50 dark:bg-white/5 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:shadow-md"
+                        onClick={() => {
+                          // Placeholder for payment selection logic
+                          // setSelectedPlan(plan); 
+                          // console.log("Selected plan:", plan);
+                        }}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {plan.title}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300">
+                                {plan.durationInDays} Days
+                              </span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500">•</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {plan.hoursPerDay}h / day
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="block text-lg font-black text-gray-900 dark:text-white group-hover:scale-105 transition-transform">
+                              ₹{plan.price}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 dark:text-gray-400">No public plans available at the moment.</p>
+                    </div>
+                  )}
                 </div>
-              ))
-            ) : (
-              <p className="text-center text-gray-500">No public plans available.</p>
+
+                <button className="w-full relative overflow-hidden bg-gray-900 dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Proceed to Payment
+                  </span>
+                </button>
+              </div>
             )}
 
-            <button className="w-full bg-black dark:bg-white text-white dark:text-black py-3 rounded-lg font-bold mt-6 hover:opacity-80 transition">
-              Proceed to Pay
-            </button>
+            {scanResult === 'ERROR' && (
+              <button
+                onClick={() => setScanResult(null)}
+                className="w-full bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-all duration-200"
+              >
+                Try Again
+              </button>
+            )}
           </div>
-        )}
-
-        {scanResult === 'ERROR' && (
-          <button
-            onClick={() => setScanResult(null)}
-            className="w-full bg-gray-900 dark:bg-white text-white dark:text-black py-3 rounded-lg font-bold mt-6"
-          >
-            Try Again
-          </button>
-        )}
+        </div>
       </div>
     </div>
   );

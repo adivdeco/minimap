@@ -12,6 +12,7 @@ import AllLibraries from './pages/AllLibraries';
 import MyLibraries from './pages/MyLibraries'; // Owner view
 import EditLibrary from './pages/EditLibrary';
 import LibraryDetails from './pages/LibraryDetails';
+import LibraryAdminPanel from './pages/LibraryAdminPanel'; // Admin panel for subscriptions & plans
 import Profile from './pages/Profile';
 import ManageUsers from './components/LibraryUsersManagement';
 import './index.css';
@@ -47,6 +48,7 @@ function App() {
               <Route path="/library/:id" element={<ProtectedRoute><LibraryDetails /></ProtectedRoute>} />
               <Route path="/my-libraries" element={<ProtectedRoute><MyLibraries /></ProtectedRoute>} />
               <Route path="/edit-library/:id" element={<ProtectedRoute><EditLibrary /></ProtectedRoute>} />
+              <Route path="/library/:id/admin" element={<ProtectedRoute><LibraryAdminPanel /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><AllUsers /></ProtectedRoute>} />
               <Route path="/library/:id/users" element={<ProtectedRoute><ManageUsers /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

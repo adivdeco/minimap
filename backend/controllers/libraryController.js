@@ -894,41 +894,70 @@ const getLibraryUsers = async (req, res) => {
             userIds.some(uid => uid.toString() === sub.userId._id.toString())
         );
 
-        let usersData = relevantSubs.map(sub => {
-            const attendance = attendanceMap.get(sub.userId._id.toString()) || {
-                totalSessions: 0,
-                totalMinutes: 0
-            };
+        // Group subscriptions by user to avoid duplicates
+        const userMap = new Map();
 
-            // Find the plan name from library plans
-            // sub.planId might be a string or ObjectId
-            const planDetails = library.plans.find(p => p._id.toString() === sub.planId.toString());
+        relevantSubs.forEach(sub => {
+            const userIdStr = sub.userId._id.toString();
+            const existingEntry = userMap.get(userIdStr);
 
-            return {
-                userId: sub.userId._id,
-                userName: sub.userId.name,
-                email: sub.userId.email,
-                phone: sub.userId.phone || 'N/A',
-                avatar: sub.userId.avatar || '',
-                subscription: {
-                    subscriptionId: sub._id,
-                    planName: sub.planName || planDetails?.name || 'Unknown Plan',
-                    planId: sub.planId,
-                    startDate: sub.startDate,
-                    expiryDate: sub.expiryDate,
-                    status: sub.status,
-                    pricePaid: sub.pricePaid
-                },
-                attendance: {
-                    totalSessions: attendance.totalSessions || 0,
-                    totalMinutesUsed: attendance.totalMinutes || 0,
-                    totalHoursUsed: Math.round((attendance.totalMinutes || 0) / 60 * 100) / 100,
-                    firstVisit: attendance.firstVisit || null,
-                    lastVisit: attendance.lastVisit || null
-                },
-                joinedAt: sub.userId.createdAt
-            };
+            // Determine if we should use this subscription over the existing one
+            // Priority: Active > Expired > Cancelled
+            // Tie-breaker: Latest startDate
+            let useThisSub = false;
+
+            if (!existingEntry) {
+                useThisSub = true;
+            } else {
+                const currentStatus = sub.status;
+                const existingStatus = existingEntry.subscription.status;
+
+                if (currentStatus === 'active' && existingStatus !== 'active') {
+                    useThisSub = true;
+                } else if (currentStatus === existingStatus) {
+                    // If status is same, pick the one with later start date
+                    if (new Date(sub.startDate) > new Date(existingEntry.subscription.startDate)) {
+                        useThisSub = true;
+                    }
+                }
+            }
+
+            if (useThisSub) {
+                const attendance = attendanceMap.get(userIdStr) || {
+                    totalSessions: 0,
+                    totalMinutes: 0
+                };
+
+                const planDetails = library.plans.find(p => p._id.toString() === sub.planId.toString());
+
+                userMap.set(userIdStr, {
+                    userId: sub.userId._id,
+                    userName: sub.userId.name,
+                    email: sub.userId.email,
+                    phone: sub.userId.phone || 'N/A',
+                    avatar: sub.userId.avatar || '',
+                    subscription: {
+                        subscriptionId: sub._id,
+                        planName: sub.planName || planDetails?.name || 'Unknown Plan',
+                        planId: sub.planId,
+                        startDate: sub.startDate,
+                        expiryDate: sub.expiryDate,
+                        status: sub.status,
+                        pricePaid: sub.pricePaid
+                    },
+                    attendance: {
+                        totalSessions: attendance.totalSessions || 0,
+                        totalMinutesUsed: attendance.totalMinutes || 0,
+                        totalHoursUsed: Math.round((attendance.totalMinutes || 0) / 60 * 100) / 100,
+                        firstVisit: attendance.firstVisit || null,
+                        lastVisit: attendance.lastVisit || null
+                    },
+                    joinedAt: sub.userId.createdAt
+                });
+            }
         });
+
+        const usersData = Array.from(userMap.values());
 
         // Apply sorting
         usersData.sort((a, b) => {
