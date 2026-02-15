@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getLibraryById, rateLibrary, deleteReview } from '../api/library';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const LibraryDetails = () => {
     const { id } = useParams();
@@ -83,9 +84,7 @@ const LibraryDetails = () => {
     };
 
     if (loading) return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-500"></div>
-        </div>
+        <LoadingSpinner/>
     );
 
     if (!library) return null;

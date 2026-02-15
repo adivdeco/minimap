@@ -6,6 +6,7 @@ import * as axiosClient from "../api/users"; // Using the existing API helper we
 import { UserUpdateSchema } from "../api/userValidationSchema";
 import { useAuth } from "../context/AuthContext";
 import ImageUpload from "./ImageUpload";
+import LoadingSpinner from "../components/LoadingSpinner";
 // Assuming Navbar is part of Layout or handled differently in this project, but user asked for it. 
 // We generally use a Layout component in this project, but I'll check if they want the exact import. 
 // For now, I will NOT include Navbar inside the page content if the App structure already has a layout.
@@ -215,7 +216,7 @@ function AllUsers() {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+ <LoadingSpinner/>
             </div>
         );
     }

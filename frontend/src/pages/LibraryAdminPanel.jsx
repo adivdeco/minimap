@@ -6,6 +6,7 @@ import PlanManagement from '../components/PlanManagement';
 import UserSubscriptionManagement from '../components/UserSubscriptionManagement';
 import { toast } from 'react-toastify';
 import { Settings, Users, DollarSign, ArrowLeft } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 // =====================================================
 // LIBRARY ADMIN PANEL
@@ -39,8 +40,7 @@ const LibraryAdminPanel = () => {
                 <Navbar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                        <p className="mt-4 text-gray-600">Loading...</p>
+                    <LoadingSpinner/>
                     </div>
                 </div>
             </div>

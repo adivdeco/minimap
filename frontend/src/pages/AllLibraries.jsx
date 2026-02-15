@@ -89,7 +89,7 @@ const AllLibraries = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white transition-colors duration-300">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f0f] text-gray-900 dark:text-white transition-colors duration-300">
 
             {/* Ambient Background */}
             <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
@@ -100,10 +100,10 @@ const AllLibraries = () => {
             <Navbar />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
-                
+
                 {/* Header Section - No Animation variants on parent wrapper to avoid 'stuck' state */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5 }}
@@ -116,7 +116,7 @@ const AllLibraries = () => {
                         </p>
                     </motion.div>
 
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5 }}
@@ -172,7 +172,7 @@ const AllLibraries = () => {
                     /* FIX: The Grid itself is now a motion.div 
                        This ensures the 'visible' state is passed down to children correctly
                     */
-                    <motion.div 
+                    <motion.div
                         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-10"
                         variants={gridContainerVariants}
                         initial="hidden"
@@ -183,7 +183,7 @@ const AllLibraries = () => {
                                 key={lib._id}
                                 variants={cardVariants}
                                 whileHover={{ y: -5 }}
-                                className="bg-white dark:bg-[#0F0F12] rounded-3xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-lg dark:shadow-none hover:shadow-2xl hover:shadow-purple-500/10 dark:hover:border-purple-500/20 transition-all duration-300 group flex flex-col h-full"
+                                className="bg-white dark:bg-gray-900/50 backdrop-blur-xl rounded-3xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-lg dark:shadow-none hover:shadow-2xl hover:shadow-purple-500/10 dark:hover:border-purple-500/20 transition-all duration-300 group flex flex-col h-full"
                             >
                                 {/* Image Section */}
                                 <div className="relative h-48 shrink-0 overflow-hidden bg-gray-100 dark:bg-white/5">

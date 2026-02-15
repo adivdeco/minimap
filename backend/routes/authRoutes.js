@@ -12,12 +12,13 @@ const {
     updateProfile,
     changePassword
 } = require('../controllers/authController');
+const { authLimiter } = require('../middleware/rateLimiter');
 const authMiddleware = require('../middleware/authMiddleware');
 
 // Public routes
-router.post('/register', registerUser);
-router.post('/login', loginUser);
-router.post('/google', socialLogin);
+router.post('/register', authLimiter, registerUser);
+router.post('/login', authLimiter, loginUser);
+router.post('/google', authLimiter, socialLogin);
 router.post('/logout', logoutUser);
 
 // Protected routes

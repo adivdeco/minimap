@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Draggable from 'react-draggable';
-import { 
-    User, 
-    Armchair, 
-    Save, 
-    ZoomIn, 
-    ZoomOut, 
+import {
+    User,
+    Armchair,
+    Save,
+    ZoomIn,
+    ZoomOut,
     Maximize,
     Grid3X3
 } from 'lucide-react';
@@ -24,15 +24,15 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, scale }) 
 
     const getStatusStyles = (status) => {
         switch (status) {
-            case 'Available': 
+            case 'Available':
                 return 'bg-white border-green-500 text-green-700 hover:bg-green-50 ring-green-200';
-            case 'Occupied': 
+            case 'Occupied':
                 return 'bg-red-50 border-red-500 text-red-700 ring-red-200';
-            case 'Reserved': 
+            case 'Reserved':
                 return 'bg-blue-50 border-blue-500 text-blue-700 ring-blue-200';
-            case 'Maintenance': 
+            case 'Maintenance':
                 return 'bg-gray-100 border-gray-400 text-gray-400 cursor-not-allowed';
-            default: 
+            default:
                 return 'bg-white border-gray-200 text-gray-600';
         }
     };
@@ -41,7 +41,7 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, scale }) 
         <Draggable
             position={{ x: currentX, y: currentY }}
             // Grid snapping: Moves in 10px increments for easier alignment
-            grid={[10, 10]} 
+            grid={[10, 10]}
             scale={scale} // Important for dragging correctly while zoomed
             onStop={(e, data) => onDrag(e, data, seat._id)}
             disabled={!isEditMode}
@@ -61,8 +61,8 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, scale }) 
                     // Prevent click trigger after a drag
                     if (!isEditMode) onUpdate(seat);
                 }}
-                style={{ 
-                    transition: isEditMode ? 'none' : 'transform 0.2s, background-color 0.2s' 
+                style={{
+                    transition: isEditMode ? 'none' : 'transform 0.2s, background-color 0.2s'
                 }}
             >
                 {/* Seat Icon / Number */}
@@ -88,7 +88,7 @@ const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditM
     const [saving, setSaving] = useState(false);
     const [zoom, setZoom] = useState(1);
     const containerRef = useRef(null);
-    
+
     // Dynamic Canvas Height
     const [canvasHeight, setCanvasHeight] = useState(600);
 
@@ -134,10 +134,10 @@ const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditM
 
     return (
         <div className="mt-8 flex flex-col gap-4">
-            
+
             {/* --- TOOLBAR --- */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                
+
                 {/* Title & Zoom Controls */}
                 <div className="flex items-center justify-between w-full md:w-auto gap-4">
                     <h2 className="text-lg font-bold text-gray-700 flex items-center gap-2">
@@ -212,7 +212,7 @@ const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditM
             {/* --- CANVAS CONTAINER --- */}
             {/* overflow-auto creates the scrollable window for mobile */}
             <div className="relative w-full overflow-auto bg-slate-100 border-2 border-gray-200 rounded-2xl shadow-inner scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent h-[70vh]">
-                
+
                 {/* The Actual Scalable Canvas */}
                 <div
                     ref={containerRef}
@@ -224,10 +224,10 @@ const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditM
                         height: `${canvasHeight}px`,
                         // We assume a standard width of 1000px for the layout logic
                         // The user scrolls if their screen is smaller
-                        width: '1000px', 
+                        width: '1000px',
                         transform: `scale(${zoom})`,
-                        backgroundImage: isEditMode 
-                            ? 'linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px)' 
+                        backgroundImage: isEditMode
+                            ? 'linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px)'
                             : 'radial-gradient(#cbd5e1 1px, transparent 1px)',
                         backgroundSize: isEditMode ? '20px 20px' : '20px 20px'
                     }}

@@ -21,6 +21,8 @@ initScheduler();
 
 const app = express();
 
+const { apiLimiter } = require('./middleware/rateLimiter');
+
 // Middleware
 app.use(cors({
     origin: ["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174", process.env.APP_URL],
@@ -30,6 +32,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+
+// Apply Rate Limiting
+app.use('/api', apiLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);

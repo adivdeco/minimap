@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import PrintQrComponent from '../components/qrCodeData';
 import SeatManagement from '../components/SeatManagement';
 import PlanManagement from '../components/PlanManagement';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const AMENITIES_OPTIONS = [
     'High-Speed WiFi', 'AC', 'Non-AC', 'Personal Cabin',
@@ -141,7 +142,7 @@ const EditLibrary = () => {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-500"></div>
+<LoadingSpinner/>
             </div>
         );
     }

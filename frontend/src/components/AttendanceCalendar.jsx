@@ -9,6 +9,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useTheme } from '../context/ThemeContext';
+import LoadingSpinner from './LoadingSpinner';
+
 
 const AttendanceCalendar = () => {
     const { theme } = useTheme();
@@ -139,7 +141,7 @@ const AttendanceCalendar = () => {
     if (loading) {
         return (
             <div className="flex h-96 justify-center items-center">
-                <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+          <LoadingSpinner/>
             </div>
         );
     }

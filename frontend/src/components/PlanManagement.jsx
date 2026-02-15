@@ -9,6 +9,8 @@ const PlanManagement = ({ libraryId }) => {
     const [showModal, setShowModal] = useState(false);
     const [editingPlan, setEditingPlan] = useState(null);
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     // Form State
     const [formData, setFormData] = useState({
         name: '',
@@ -39,6 +41,9 @@ const PlanManagement = ({ libraryId }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
+        setIsSubmitting(true);
         try {
             const payload = {
                 ...formData,
@@ -58,6 +63,8 @@ const PlanManagement = ({ libraryId }) => {
             fetchPlans();
         } catch (error) {
             toast.error(error.response?.data?.message || "Failed to save plan");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -273,9 +280,17 @@ const PlanManagement = ({ libraryId }) => {
 
                             <button
                                 type="submit"
-                                className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors mt-2"
+                                disabled={isSubmitting}
+                                className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                {editingPlan ? 'Update Plan' : 'Create Plan'}
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    editingPlan ? 'Update Plan' : 'Create Plan'
+                                )}
                             </button>
                         </form>
                     </div>
