@@ -3,6 +3,9 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
+// Load env vars
+dotenv.config();
+
 const connectDB = require('./config/db');
 const initScheduler = require('./scheduler');
 const authRoutes = require('./routes/authRoutes');
@@ -10,9 +13,6 @@ const libraryRoutes = require('./routes/libraryRoutes');
 const seatRoutes = require('./routes/seatRoutes');
 const entryRoutes = require('./routes/entryRoutes');
 const planRoutes = require('./routes/planRoutes');
-
-// Load env vars
-dotenv.config();
 
 // Connect to database
 connectDB();

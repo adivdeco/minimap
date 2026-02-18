@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { updateProfile, changePassword } from '../api/users';
 import { useAuth } from '../context/AuthContext';
 import AttendanceCalendar from '../components/AttendanceCalendar';
-import { 
-    User, Lock, Calendar, ArrowLeft, Camera,LogOut, 
-    Mail, Phone, Shield, Save, AlertCircle, CheckCircle2 
+import {
+    User, Lock, Calendar, ArrowLeft, Camera, LogOut,
+    Mail, Phone, Shield, Save, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth0 } from '@auth0/auth0-react';
@@ -74,7 +74,7 @@ const Profile = () => {
         }
     };
 
-        const handleLogout = () => {
+    const handleLogout = () => {
         logout();
         auth0Logout({ logoutParams: { returnTo: window.location.origin + '/login' } });
         navigate('/login');
@@ -89,18 +89,18 @@ const Profile = () => {
 
     return (
         <div className="min-h-screen bg-[#050505] text-white selection:bg-purple-500/30">
-             {/* Ambient Background Glows */}
-             <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+            {/* Ambient Background Glows */}
+            <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[20%] right-[-10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[120px]" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-900/10 rounded-full blur-[120px]" />
             </div>
 
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
-                
+
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-8">
-                    <button 
-                        onClick={() => navigate('/')} 
+                    <button
+                        onClick={() => navigate('/')}
                         className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all border border-white/5 hover:border-white/10"
                     >
                         <ArrowLeft size={20} />
@@ -109,7 +109,7 @@ const Profile = () => {
                 </div>
 
                 <div className="flex flex-col lg:flex-row gap-8">
-                    
+
                     {/* SIDEBAR NAVIGATION */}
                     <div className="w-full lg:w-80 flex-shrink-0 space-y-6">
                         {/* User Mini Profile */}
@@ -117,7 +117,7 @@ const Profile = () => {
                             <div className="relative mb-4">
                                 <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-purple-500 to-pink-500">
                                     <div className="w-full h-full rounded-full bg-[#18181b] overflow-hidden flex items-center justify-center">
-                                         {user?.avatar ? (
+                                        {user?.avatar ? (
                                             <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
                                             <span className="text-3xl font-bold text-white">{user?.name?.charAt(0)?.toUpperCase()}</span>
@@ -135,19 +135,19 @@ const Profile = () => {
 
                         {/* Navigation Menu */}
                         <div className="bg-[#0F0F12] border border-white/10 rounded-3xl p-2 overflow-hidden">
-                            <TabButton 
-                                id="profile" 
-                                active={activeTab} 
-                                onClick={setActiveTab} 
-                                icon={<User size={18} />} 
-                                label="Personal Info" 
+                            <TabButton
+                                id="profile"
+                                active={activeTab}
+                                onClick={setActiveTab}
+                                icon={<User size={18} />}
+                                label="Personal Info"
                             />
-                            <TabButton 
-                                id="password" 
-                                active={activeTab} 
-                                onClick={setActiveTab} 
-                                icon={<Lock size={18} />} 
-                                label="Security" 
+                            <TabButton
+                                id="password"
+                                active={activeTab}
+                                onClick={setActiveTab}
+                                icon={<Lock size={18} />}
+                                label="Security"
                             />
                             {/* <TabButton 
                                 id="attendance" 
@@ -168,19 +168,18 @@ const Profile = () => {
 
                     {/* MAIN CONTENT AREA */}
                     <div className="flex-1">
-                        
+
                         {/* Status Message */}
                         <AnimatePresence>
                             {message.text && (
-                                <motion.div 
+                                <motion.div
                                     initial={{ opacity: 0, y: -10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${
-                                        message.type === 'success' 
-                                            ? 'bg-green-500/10 border-green-500/20 text-green-400' 
+                                    className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${message.type === 'success'
+                                            ? 'bg-green-500/10 border-green-500/20 text-green-400'
                                             : 'bg-red-500/10 border-red-500/20 text-red-400'
-                                    }`}
+                                        }`}
                                 >
                                     {message.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
                                     <span className="font-medium">{message.text}</span>
@@ -190,10 +189,10 @@ const Profile = () => {
 
                         <div className="bg-[#0F0F12] border border-white/10 rounded-3xl p-6 md:p-8 min-h-[500px]">
                             <AnimatePresence mode="wait">
-                                
+
                                 {/* PROFILE TAB */}
                                 {activeTab === 'profile' && (
-                                    <motion.div 
+                                    <motion.div
                                         key="profile"
                                         variants={tabContentVariants}
                                         initial="hidden"
@@ -202,25 +201,73 @@ const Profile = () => {
                                     >
                                         <h3 className="text-2xl font-bold text-white mb-6">Personal Information</h3>
                                         <form onSubmit={handleProfileSubmit} className="space-y-6 max-w-2xl">
-                                            
-                                            {/* Avatar Input */}
+
+                                            {/* Avatar Customization */}
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-400 mb-2">Avatar URL</label>
-                                                <div className="flex gap-4">
-                                                    <div className="flex-1 relative group">
-                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                            <Camera size={18} className="text-gray-500" />
+                                                <label className="block text-sm font-medium text-gray-400 mb-4">Profile Picture</label>
+                                                <div className="bg-[#18181b] border border-white/10 rounded-2xl p-6">
+                                                    <div className="flex flex-col md:flex-row gap-6 items-center">
+                                                        {/* Preview */}
+                                                        <div className="relative group">
+                                                            <div className="w-32 h-32 rounded-full border-4 border-purple-500/20 overflow-hidden bg-white/5">
+                                                                <img
+                                                                    src={profileForm.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileForm.name}`}
+                                                                    alt="Avatar Preview"
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            </div>
+                                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="bg-black/50 w-full h-full rounded-full flex items-center justify-center backdrop-blur-sm">
+                                                                    <span className="text-white text-xs font-medium">Preview</span>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <input
-                                                            type="url"
-                                                            value={profileForm.avatar}
-                                                            onChange={(e) => setProfileForm({ ...profileForm, avatar: e.target.value })}
-                                                            placeholder="https://..."
-                                                            className="w-full pl-10 pr-4 py-3 bg-[#18181b] border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all"
-                                                        />
+
+                                                        {/* Controls */}
+                                                        <div className="flex-1 space-y-4 w-full">
+                                                            <div>
+                                                                <label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">Avatar Style</label>
+                                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                                    {['avataaars', 'bottts', 'adventurer', 'initials'].map((style) => (
+                                                                        <button
+                                                                            key={style}
+                                                                            type="button"
+                                                                            onClick={() => setProfileForm({ ...profileForm, avatar: `https://api.dicebear.com/7.x/${style}/svg?seed=${profileForm.name}` })}
+                                                                            className={`px-3 py-2 rounded-lg text-sm border transition-all ${profileForm.avatar?.includes(style)
+                                                                                    ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                                                                                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                                                                                }`}
+                                                                        >
+                                                                            {style.charAt(0).toUpperCase() + style.slice(1)}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={profileForm.avatar}
+                                                                    onChange={(e) => setProfileForm({ ...profileForm, avatar: e.target.value })}
+                                                                    placeholder="Custom Avatar URL..."
+                                                                    className="flex-1 px-4 py-2 bg-black/20 border border-white/10 rounded-xl text-sm text-gray-300 focus:outline-none focus:border-purple-500/50"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const randomSeed = Math.random().toString(36).substring(7);
+                                                                        const currentStyle = ['avataaars', 'bottts', 'adventurer', 'initials'].find(s => profileForm.avatar?.includes(s)) || 'avataaars';
+                                                                        setProfileForm({ ...profileForm, avatar: `https://api.dicebear.com/7.x/${currentStyle}/svg?seed=${randomSeed}` });
+                                                                    }}
+                                                                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm transition-colors flex items-center gap-2"
+                                                                >
+                                                                    <Camera size={16} />
+                                                                    Regenerate
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <p className="text-xs text-gray-500 mt-2">Paste a direct link to an image (e.g., from Imgur or Google Photos).</p>
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -287,7 +334,7 @@ const Profile = () => {
 
                                 {/* SECURITY TAB */}
                                 {activeTab === 'password' && (
-                                    <motion.div 
+                                    <motion.div
                                         key="password"
                                         variants={tabContentVariants}
                                         initial="hidden"
@@ -296,7 +343,7 @@ const Profile = () => {
                                     >
                                         <h3 className="text-2xl font-bold text-white mb-2">Security</h3>
                                         <p className="text-gray-400 mb-8">Update your password to keep your account secure.</p>
-                                        
+
                                         <form onSubmit={handlePasswordSubmit} className="space-y-6 max-w-xl">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-400 mb-2">Current Password</label>
@@ -400,11 +447,10 @@ const Profile = () => {
 const TabButton = ({ id, active, onClick, icon, label }) => (
     <button
         onClick={() => onClick(id)}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 mb-1 group ${
-            active === id 
-                ? 'bg-white/10 text-white font-medium' 
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 mb-1 group ${active === id
+                ? 'bg-white/10 text-white font-medium'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
-        }`}
+            }`}
     >
         <div className={`p-2 rounded-lg transition-colors ${active === id ? 'bg-purple-500 text-white' : 'bg-white/5 text-gray-400 group-hover:bg-white/10'}`}>
             {icon}

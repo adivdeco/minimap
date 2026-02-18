@@ -40,7 +40,8 @@ const registerUser = async (req, res) => {
             email,
             password: hashedPassword,
             role: 'User',
-            loginProvider: 'local'
+            loginProvider: 'local',
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`
         });
 
         const token = jwt.sign(
@@ -161,34 +162,65 @@ const loginUser = async (req, res) => {
 
 // @desc    Social/Google login
 // @route   POST /api/auth/google
+const { OAuth2Client } = require('google-auth-library');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "dummy_client_id";
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+if (!process.env.GOOGLE_CLIENT_ID) {
+    console.warn("WARNING: GOOGLE_CLIENT_ID is not set in .env. Google Auth will not work.");
+}
+
 const socialLogin = async (req, res) => {
     try {
-        const { email, name, auth0Id, avatar, email_verified } = req.body;
+        const { credential, clientId, auth0User } = req.body;
 
-        if (!email || !auth0Id) {
-            return res.status(400).json({ message: "Invalid social login data" });
+        let email, name, picture, googleId, email_verified;
+
+        if (auth0User) {
+            // AUTH0 FLOW
+            email = auth0User.email;
+            name = auth0User.name;
+            picture = auth0User.picture;
+            googleId = auth0User.sub; // Auth0 sub is unique ID (e.g., "google-oauth2|123456")
+            email_verified = auth0User.email_verified;
+        } else if (credential) {
+            // GOOGLE DIRECT FLOW
+            const ticket = await client.verifyIdToken({
+                idToken: credential,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+            const payload = ticket.getPayload();
+            email = payload.email;
+            name = payload.name;
+            picture = payload.picture;
+            googleId = `google|${payload.sub}`;
+            email_verified = payload.email_verified;
+        } else {
+            return res.status(400).json({ message: "No credential or user data provided" });
         }
 
         let user = await User.findOne({
-            $or: [{ auth0Id }, { email }]
+            $or: [{ auth0Id: googleId }, { email: email }]
         });
 
         if (user) {
+            // Update existing user with Google/Auth0 info if missing
             if (!user.auth0Id) {
-                user.auth0Id = auth0Id;
-                user.loginProvider = auth0Id.startsWith('google') ? 'google' : 'github';
-                if (!user.avatar && avatar) user.avatar = avatar;
+                user.auth0Id = googleId;
+                user.loginProvider = 'google'; // or 'auth0'
+                if (!user.avatar && picture) user.avatar = picture;
                 await user.save();
             }
         } else {
+            // Create new user
             user = await User.create({
                 name,
                 email,
-                auth0Id,
-                avatar,
-                loginProvider: auth0Id.startsWith('google') ? 'google' : 'github',
+                auth0Id: googleId,
+                avatar: picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
+                loginProvider: 'google',
                 role: 'User',
-                password: await bcrypt.hash(Math.random().toString(36), 10),
+                password: await bcrypt.hash(Math.random().toString(36), 10), // Random password
                 emailVerified: email_verified
             });
         }
@@ -216,7 +248,7 @@ const socialLogin = async (req, res) => {
 
     } catch (error) {
         console.error('Error in socialLogin:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        res.status(401).json({ message: 'Authentication failed', error: error.message });
     }
 };
 

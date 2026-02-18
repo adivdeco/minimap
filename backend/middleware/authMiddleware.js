@@ -12,6 +12,9 @@ const userCache = new NodeCache({
 
 const authMiddleware = async (req, res, next) => {
     try {
+        // DEBUG LOGGING
+        // console.log(`[AuthMiddleware] checking ${req.method} ${req.path}`);
+
         const token = req.cookies?.token;
         if (!token) {
             return res.status(401).json({ message: "Not logged in" });

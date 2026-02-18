@@ -1,15 +1,7 @@
-import axios from 'axios';
+import axiosClient from './axiosClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api';
-
-// Create helper instance with credentials
-const api = axios.create({
-    baseURL: API_URL,
-    withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json'
-    }
-});
+// Use shared axiosClient
+const api = axiosClient;
 
 // Scan QR and Check In
 export const checkInUser = async (qrCodeString) => {

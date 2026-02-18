@@ -22,7 +22,7 @@ router.post('/google', authLimiter, socialLogin);
 router.post('/logout', logoutUser);
 
 // Protected routes
-router.get('/check-session', authMiddleware, checkSession);
+router.get('/check-session', checkSession);
 
 // User management routes (Admin/Co-Admin)
 router.get('/users', authMiddleware, allUsers);

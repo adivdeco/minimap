@@ -1,15 +1,7 @@
-import axios from 'axios';
+import axiosClient from './axiosClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api';
-
-// Create axios instance with interceptor for auth token (if not already global)
-const api = axios.create({
-    baseURL: API_URL,
-    withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json'
-    }
-});
+// Use axiosClient instead of creating a new instance
+const api = axiosClient;
 
 export const getLibrarySeats = async (libraryId) => {
     try {

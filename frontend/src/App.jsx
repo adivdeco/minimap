@@ -21,24 +21,17 @@ const LibraryAdminPanel = lazy(() => import('./pages/LibraryAdminPanel'));
 const Profile = lazy(() => import('./pages/Profile'));
 const ManageUsers = lazy(() => import('./components/LibraryUsersManagement'));
 
-// Auth0 configuration
-const auth0Config = {
-  domain: import.meta.env.VITE_AUTH0_DOMAIN || 'your-tenant.auth0.com',
-  clientId: import.meta.env.VITE_AUTH0_CLIENT_ID || 'your-client-id',
-  authorizationParams: {
-    redirect_uri: window.location.origin
-  }
-};
-
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   return (
     <Auth0Provider
-      domain={auth0Config.domain}
-      clientId={auth0Config.clientId}
-      authorizationParams={auth0Config.authorizationParams}
+      domain={import.meta.env.VITE_AUTH0_DOMAIN}
+      clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
+      authorizationParams={{
+        redirect_uri: window.location.origin
+      }}
     >
       <Router>
         <ThemeProvider>

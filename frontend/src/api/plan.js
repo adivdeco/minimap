@@ -1,15 +1,7 @@
-import axios from 'axios';
+import axiosClient from './axiosClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api';
-
-// Create axios instance
-const api = axios.create({
-    baseURL: API_URL,
-    withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json'
-    }
-});
+// Use shared axiosClient
+const api = axiosClient;
 
 // Get plans for a library
 export const getLibraryPlans = async (libraryId) => {

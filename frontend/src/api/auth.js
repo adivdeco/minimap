@@ -16,17 +16,10 @@ export const login = async (email, password) => {
     return response.data;
 };
 
-export const googleAuth = async (auth0User) => {
-    const response = await axiosClient.post('/auth/google', {
-        auth0Id: auth0User.sub,
-        email: auth0User.email,
-        name: auth0User.name,
-        avatar: auth0User.picture,
-        email_verified: auth0User.email_verified
-    });
-    if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
+// Social login (Google/Auth0)
+export const googleAuth = async (data) => {
+    // data can be { credential, clientId } (Google direct) or { auth0User } (Auth0)
+    const response = await axiosClient.post('/auth/google', data);
     return response.data;
 };
 
