@@ -5,12 +5,13 @@ const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const Plan = require('../models/Plan');
 const authMiddleware = require('../middleware/authMiddleware');
+const mongoose = require('mongoose');
 
 // --- CONFIGURATION ---
 const MAX_DAILY_CHECKINS = 3;
 
-// --- HELPER: Get Today's Usage Stats ---
-async function getDailyStats(userId, libraryId) {
+// --- HELPER: Get Today's Usage Stats (With Session) ---
+async function getDailyStats(userId, libraryId, session) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -18,7 +19,7 @@ async function getDailyStats(userId, libraryId) {
         userId,
         libraryId,
         date: today
-    });
+    }).session(session);
 
     if (!record) {
         return { minutesUsed: 0, sessionsCount: 0 };
@@ -30,122 +31,28 @@ async function getDailyStats(userId, libraryId) {
     };
 }
 
-// --- HELPER: Resolve Plan Details (Handles Embedded vs Standalone) ---
+// --- HELPER: Resolve Plan Details ---
 async function resolvePlan(planId, library) {
-    // 1. Try finding in standalone Plan collection
     let plan = await Plan.findById(planId);
-
-    // 2. If not found, look in Library's embedded plans
     if (!plan && library.plans && library.plans.length > 0) {
         plan = library.plans.id(planId);
     }
-
     return plan;
 }
 
 // ==========================================
-// 1. CHECK-IN CONTROLLER
+// 1. CORE LOGIC: ASSIGN SEAT (Pure Function)
 // ==========================================
-exports.checkIn = async (req, res) => {
-    try {
-        const { qrCodeString } = req.body;
-        const userId = req.finduser._id;
-
-        // 1. Identify Library
-        const library = await Library.findOne({ 'accessConfig.qrCodeData': qrCodeString });
-        if (!library) return res.status(404).json({ success: false, msg: "Invalid QR Code" });
-
-        // 2. Prevent Double Entry (User already sitting?)
-        const existingSeat = await Seat.findOne({ currentOccupant: userId });
-        if (existingSeat) {
-            return res.status(400).json({
-                success: false,
-                msg: `You are already seated at ${existingSeat.seatNumber}. Please checkout first.`
-            });
-        }
-
-        // 3. Security Check: Daily Limits
-        const dailyStats = await getDailyStats(userId, library._id);
-        if (dailyStats.sessionsCount >= MAX_DAILY_CHECKINS) {
-            return res.status(403).json({
-                success: false,
-                msg: `Daily entry limit reached (${MAX_DAILY_CHECKINS} times/day). See you tomorrow!`
-            });
-        }
-
-        // 4. Check for ACTIVE Subscription
-        // We look for a Subscription document that is active and not expired
-        const activeSub = await Subscription.findOne({
-            userId,
-            libraryId: library._id,
-            status: 'active',
-            expiryDate: { $gt: new Date() }
-        });
-
-        // --- SCENARIO A: USER HAS VALID SUBSCRIPTION ---
-        if (activeSub) {
-            // Pass the full activeSub object so we can link IDs correctly
-            return await assignSeat(library, userId, activeSub, res, dailyStats);
-        }
-
-        // --- SCENARIO B: NO ACTIVE SUBSCRIPTION (CHECK FOR TRIAL ELIGIBILITY) ---
-
-        // Check if they ever had a subscription (even expired/cancelled)
-        const history = await Subscription.exists({ userId, libraryId: library._id });
-
-        // If they have history, they are NOT eligible for a trial -> Show Plans
-        if (history) {
-            return res.status(200).json({
-                success: false,
-                action: 'SHOW_PLANS',
-                libraryId: library._id,
-                plans: library.plans, // Send real plans
-                msg: "Your subscription has expired. Please renew to enter."
-            });
-        }
-
-        // If no history, find a Trial Plan in this library
-        // We look in embedded plans first as trials are usually specific to library config
-        const trialPlan = library.plans.find(p => p.trialDays > 0);
-
-        if (trialPlan) {
-            return res.status(200).json({
-                success: false,
-                action: 'OFFER_TRIAL', // Frontend should show "Start Free Trial" button
-                libraryId: library._id,
-                planId: trialPlan._id,
-                trialDays: trialPlan.trialDays,
-                msg: `Welcome! You are eligible for a ${trialPlan.trialDays}-Day Free Trial.`
-            });
-        }
-
-        // No history, but no trial plan exists
-        return res.status(200).json({
-            success: false,
-            action: 'SHOW_PLANS',
-            libraryId: library._id,
-            plans: library.plans, // Send real plans
-            msg: "Welcome! Please choose a plan to start."
-        });
-
-    } catch (err) {
-        console.error("CheckIn Error:", err);
-        res.status(500).json({ success: false, msg: "Server Error during Check-in" });
-    }
-};
-
-// ==========================================
-// 2. ASSIGN SEAT LOGIC (Centralized)
-// ==========================================
-async function assignSeat(library, userId, subscription, res, dailyStats = { minutesUsed: 0 }) {
-    constnow = new Date();
+/**
+ * Executes the database writes to assign a seat.
+ * Throws Errors with prefixes (e.g., "LIMIT:", "FULL:") for the controller to handle.
+ */
+async function assignSeat(library, userId, subscription, dailyStats, session) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. Get Plan Details (Hours per day limit)
+    // 1. Get Plan Limits
     const planDoc = await resolvePlan(subscription.planId, library);
-
-    // Default to 5 hours if plan not found or limit not set
     let hoursPerDay = (planDoc && planDoc.hoursPerDay) ? planDoc.hoursPerDay : 5;
 
     // 2. Calculate Remaining Time
@@ -154,28 +61,24 @@ async function assignSeat(library, userId, subscription, res, dailyStats = { min
     let remainingMinutes = maxMinutes - usedMinutes;
 
     if (remainingMinutes <= 0) {
-        return res.status(403).json({
-            success: false,
-            msg: `Daily Quota Exceeded! You used ${Math.floor(usedMinutes / 60)}h ${usedMinutes % 60}m of your ${hoursPerDay}h limit.`
-        });
+        throw new Error(`LIMIT: Daily Quota Exceeded! You used ${Math.floor(usedMinutes / 60)}h ${usedMinutes % 60}m of your ${hoursPerDay}h limit.`);
     }
 
     const expectedEndTime = new Date(Date.now() + remainingMinutes * 60000);
 
     // 3. Find an Available Seat
-    // Using aggregation for random selection prevents "always picking Seat 1"
     const randomSeatResult = await Seat.aggregate([
         { $match: { libraryId: library._id, status: 'Available' } },
         { $sample: { size: 1 } }
-    ]);
+    ]).session(session);
 
     if (!randomSeatResult || randomSeatResult.length === 0) {
-        return res.status(400).json({ success: false, msg: "Library is full! No seats available." });
+        throw new Error("FULL: Library is full! No seats available.");
     }
 
     const selectedSeat = randomSeatResult[0];
 
-    // 4. Lock the Seat (Atomic Operation)
+    // 4. Lock the Seat (Atomic Write)
     const availableSeat = await Seat.findOneAndUpdate(
         { _id: selectedSeat._id, status: 'Available' },
         {
@@ -184,14 +87,14 @@ async function assignSeat(library, userId, subscription, res, dailyStats = { min
             occupiedSince: new Date(),
             expectedEndTime: expectedEndTime
         },
-        { new: true }
+        { new: true, session: session }
     );
 
     if (!availableSeat) {
-        return res.status(400).json({ success: false, msg: "Seat was just taken! Please try scanning again." });
+        throw new Error("RACE: Seat was taken just before you confirmed. Please try again.");
     }
 
-    // 5. Update Attendance Bucket (Log the session start)
+    // 5. Update Attendance Bucket
     await Attendance.findOneAndUpdate(
         { userId, libraryId: library._id, date: today },
         {
@@ -205,23 +108,20 @@ async function assignSeat(library, userId, subscription, res, dailyStats = { min
             },
             $inc: { sessionCount: 1 }
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, new: true, setDefaultsOnInsert: true, session: session }
     );
 
-    // 6. UPDATE USER CONTEXT (CRITICAL FIX)
-    // We must link the *specific* subscription ID here.
+    // 6. Update User Context
     await User.findByIdAndUpdate(userId, {
         $set: {
-            // Seat Details
             'studentDetails.assignedSeat': {
                 seatId: availableSeat._id,
                 seatNumber: availableSeat.seatNumber,
                 checkInTime: new Date(),
                 expectedEndTime: expectedEndTime
             },
-            // Subscription Details (Ensures next auth check passes)
             'studentDetails.currentSubscription': {
-                subscriptionId: subscription._id, // <--- IMPORTANT LINK
+                subscriptionId: subscription._id,
                 libraryId: library._id,
                 planId: subscription.planId,
                 startDate: subscription.startDate,
@@ -229,53 +129,141 @@ async function assignSeat(library, userId, subscription, res, dailyStats = { min
                 status: 'active'
             }
         }
-    });
+    }, { session: session });
 
-    // 7. Refresh Cache
+    // 7. Side Effect: Invalidate Cache (Safe to do before commit in this context)
     authMiddleware.invalidateUserCache(userId);
 
+    // 8. Return Success Data
     const rHours = Math.floor(remainingMinutes / 60);
     const rMins = Math.floor(remainingMinutes % 60);
 
-    return res.json({
-        success: true,
-        action: 'SUCCESS',
+    return {
         seat: availableSeat.seatNumber,
         checkinsRemaining: MAX_DAILY_CHECKINS - (dailyStats.sessionsCount + 1),
         maxDailyCheckins: MAX_DAILY_CHECKINS,
         remainingTime: { hours: rHours, minutes: rMins },
         msg: `Checked In! Assigned Seat: ${availableSeat.seatNumber}`
-    });
+    };
 }
 
 // ==========================================
-// 3. ACTIVATE TRIAL CONTROLLER
+// 2. CONTROLLER: CHECK-IN
+// ==========================================
+exports.checkIn = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { qrCodeString } = req.body;
+        const userId = req.finduser._id;
+
+        // 1. Identify Library
+        const library = await Library.findOne({ 'accessConfig.qrCodeData': qrCodeString }).session(session);
+        if (!library) throw new Error("NOT_FOUND: Invalid QR Code");
+
+        // 2. Prevent Double Entry
+        const existingSeat = await Seat.findOne({ currentOccupant: userId }).session(session);
+        if (existingSeat) throw new Error(`BAD_REQUEST: You are already seated at ${existingSeat.seatNumber}.`);
+
+        // 3. Security Check: Daily Limits
+        const dailyStats = await getDailyStats(userId, library._id, session);
+        if (dailyStats.sessionsCount >= MAX_DAILY_CHECKINS) {
+            throw new Error(`LIMIT: Daily entry limit reached (${MAX_DAILY_CHECKINS} times/day).`);
+        }
+
+        // 4. Check Subscription
+        const activeSub = await Subscription.findOne({
+            userId,
+            libraryId: library._id,
+            status: 'active',
+            expiryDate: { $gt: new Date() }
+        }).session(session);
+
+        // --- SCENARIO A: VALID SUBSCRIPTION ---
+        if (activeSub) {
+            const resultData = await assignSeat(library, userId, activeSub, dailyStats, session);
+            await session.commitTransaction();
+            return res.json({ success: true, ...resultData });
+        }
+
+        // --- SCENARIO B: NO SUBSCRIPTION (READ-ONLY Logic) ---
+        // We abort transaction here because we are just showing plans, not writing data
+        await session.abortTransaction(); 
+        
+        const history = await Subscription.exists({ userId, libraryId: library._id }); // No session needed now
+        
+        if (history) {
+            return res.status(200).json({
+                success: false,
+                action: 'SHOW_PLANS',
+                libraryId: library._id,
+                plans: library.plans,
+                msg: "Your subscription has expired. Please renew to enter."
+            });
+        }
+
+        const trialPlan = library.plans.find(p => p.trialDays > 0);
+        if (trialPlan) {
+            return res.status(200).json({
+                success: false,
+                action: 'OFFER_TRIAL',
+                libraryId: library._id,
+                planId: trialPlan._id,
+                trialDays: trialPlan.trialDays,
+                msg: `Welcome! You are eligible for a ${trialPlan.trialDays}-Day Free Trial.`
+            });
+        }
+
+        return res.status(200).json({
+            success: false,
+            action: 'SHOW_PLANS',
+            libraryId: library._id,
+            plans: library.plans,
+            msg: "Welcome! Please choose a plan to start."
+        });
+
+    } catch (err) {
+        await session.abortTransaction();
+        console.error("CheckIn Transaction Failed:", err.message);
+
+        if (err.message.startsWith("LIMIT:")) return res.status(403).json({ success: false, msg: err.message.split(': ')[1] });
+        if (err.message.startsWith("FULL:")) return res.status(400).json({ success: false, msg: err.message.split(': ')[1] });
+        if (err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ success: false, msg: err.message.split(': ')[1] });
+        if (err.message.startsWith("NOT_FOUND:")) return res.status(404).json({ success: false, msg: err.message.split(': ')[1] });
+        if (err.message.startsWith("RACE:")) return res.status(409).json({ success: false, msg: err.message.split(': ')[1] });
+
+        res.status(500).json({ success: false, msg: "Server Error during Check-in" });
+    } finally {
+        session.endSession();
+    }
+};
+
+// ==========================================
+// 3. CONTROLLER: ACTIVATE TRIAL
 // ==========================================
 exports.activateTrial = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
         const { libraryId, planId } = req.body;
         const userId = req.finduser._id;
 
-        // Double check eligibility
-        const history = await Subscription.exists({ userId, libraryId });
-        if (history) return res.status(403).json({ msg: "Trial already used." });
+        const history = await Subscription.exists({ userId, libraryId }).session(session);
+        if (history) throw new Error("BAD_REQUEST: Trial already used.");
 
-        const library = await Library.findById(libraryId);
-        if (!library) return res.status(404).json({ msg: "Library not found" });
+        const library = await Library.findById(libraryId).session(session);
+        if (!library) throw new Error("NOT_FOUND: Library not found");
 
-        // Find Plan (Embedded or Standalone)
         const plan = await resolvePlan(planId, library);
+        if (!plan || !plan.trialDays || plan.trialDays <= 0) throw new Error("BAD_REQUEST: Invalid Trial Plan");
 
-        if (!plan || !plan.trialDays || plan.trialDays <= 0) {
-            return res.status(400).json({ msg: "Invalid Trial Plan" });
-        }
-
-        // Calculate Expiry
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + plan.trialDays);
 
-        // CREATE SUBSCRIPTION DOCUMENT
-        const newSub = await Subscription.create({
+        // Create Subscription
+        const [newSub] = await Subscription.create([{
             userId,
             libraryId,
             planId: plan._id,
@@ -284,51 +272,59 @@ exports.activateTrial = async (req, res) => {
             startDate: new Date(),
             expiryDate: expiryDate,
             status: 'active'
-        });
+        }], { session: session });
 
-        // Immediately Check User In
-        // Since it's a new trial, stats are 0
-        const initialStats = { minutesUsed: 0, sessionsCount: 0 };
+        // Check In (Stats are 0 for new user)
+        const resultData = await assignSeat(library, userId, newSub, { minutesUsed: 0, sessionsCount: 0 }, session);
 
-        // Pass the 'newSub' object so assignSeat links it to the User
-        return await assignSeat(library, userId, newSub, res, initialStats);
+        await session.commitTransaction();
+        res.json({ success: true, ...resultData });
 
     } catch (err) {
-        console.error("Activate Trial Error:", err);
+        await session.abortTransaction();
+        console.error("Activate Trial Error:", err.message);
+
+        if (err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ msg: err.message.split(': ')[1] });
+        if (err.message.startsWith("NOT_FOUND:")) return res.status(404).json({ msg: err.message.split(': ')[1] });
+        
         res.status(500).json({ msg: "Failed to activate trial" });
+    } finally {
+        session.endSession();
     }
 };
 
 // ==========================================
-// 4. CHECK-OUT CONTROLLER
+// 4. CONTROLLER: CHECK-OUT (Transactional)
 // ==========================================
 exports.checkOut = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
         const userId = req.finduser._id;
 
-        // Find where the user is sitting
-        const seat = await Seat.findOne({ currentOccupant: userId });
-        if (!seat) return res.status(400).json({ msg: "You are not currently checked in." });
+        // 1. Get current seat
+        const seat = await Seat.findOne({ currentOccupant: userId }).session(session);
+        if (!seat) throw new Error("BAD_REQUEST: You are not currently checked in.");
 
         const checkOutTime = new Date();
-
-        // Calculate Duration
+        
+        // 2. Calculate Duration
         let durationMinutes = 0;
         if (seat.occupiedSince) {
             durationMinutes = Math.round((checkOutTime - seat.occupiedSince) / 60000);
         }
-        if (durationMinutes < 1) durationMinutes = 1; // Min 1 min for records
+        if (durationMinutes < 1) durationMinutes = 1;
 
-        // 1. Release Seat
+        // 3. Release Seat
         await Seat.findByIdAndUpdate(seat._id, {
             status: 'Available',
             currentOccupant: null,
             occupiedSince: null,
             expectedEndTime: null
-        });
+        }, { session });
 
-        // 2. Update Attendance (Find today's bucket)
-        // We use $set to update the specific array element where checkOutTime is null
+        // 4. Update Attendance
         const bucketDate = new Date(seat.occupiedSince || new Date());
         bucketDate.setHours(0, 0, 0, 0);
 
@@ -345,40 +341,40 @@ exports.checkOut = async (req, res) => {
                     "sessions.$.durationMinutes": durationMinutes
                 },
                 $inc: { totalDurationToday: durationMinutes }
-            }
+            },
+            { session }
         );
 
-        // 3. Clear User's Assigned Seat
+        // 5. Clear User Context
         await User.findByIdAndUpdate(userId, {
             'studentDetails.assignedSeat': null
-        });
+        }, { session });
 
         authMiddleware.invalidateUserCache(userId);
 
-        // 4. Prepare Response Data (Remaining time calculation)
-        const dailyStats = await getDailyStats(userId, seat.libraryId);
-
-        // Get limits based on subscription
-        let hoursPerDay = 5;
+        // 6. Get Updated Stats for Response (Within Session)
+        const dailyStats = await getDailyStats(userId, seat.libraryId, session);
+        
+        // Get subscription for limits
         const activeSub = await Subscription.findOne({
             userId,
             libraryId: seat.libraryId,
-            status: 'active',
-            expiryDate: { $gt: new Date() }
-        });
+            status: 'active'
+        }).session(session);
 
+        let hoursPerDay = 5;
         if (activeSub) {
-            const planDoc = await resolvePlan(activeSub.planId, { _id: seat.libraryId }); // Minimal lib obj
+            const planDoc = await resolvePlan(activeSub.planId, { _id: seat.libraryId }); 
             if (planDoc && planDoc.hoursPerDay) hoursPerDay = planDoc.hoursPerDay;
         }
 
-        const maxMinutes = hoursPerDay * 60;
-        const usedMinutes = dailyStats.minutesUsed; // Updated with new session
-        const remainingMinutes = Math.max(0, maxMinutes - usedMinutes);
+        const remainingMinutes = Math.max(0, (hoursPerDay * 60) - dailyStats.minutesUsed);
+
+        await session.commitTransaction();
 
         res.json({
             success: true,
-            msg: `Checked out successfully. Session duration: ${durationMinutes} mins.`,
+            msg: `Checked out successfully. Session: ${durationMinutes} mins.`,
             checkinsRemaining: MAX_DAILY_CHECKINS - dailyStats.sessionsCount,
             maxDailyCheckins: MAX_DAILY_CHECKINS,
             remainingTime: {
@@ -388,208 +384,68 @@ exports.checkOut = async (req, res) => {
         });
 
     } catch (err) {
+        await session.abortTransaction();
         console.error("CheckOut Error:", err);
+        if(err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ msg: err.message.split(': ')[1] });
         res.status(500).json({ msg: "Server Error during checkout" });
+    } finally {
+        session.endSession();
     }
 };
 
 // ==========================================
-// 5. AUTO-RELEASE CRON JOB
+// 5. OFFLINE PAYMENT (Transactional)
 // ==========================================
-// This function should be called by a cron job (e.g., every 5 minutes)
-const releaseExpiredSeats = async () => {
-    try {
-        const now = new Date();
-
-        // Find occupied seats where time has passed expectedEndTime
-        const expiredSeats = await Seat.find({
-            status: 'Occupied',
-            expectedEndTime: { $lt: now }
-        });
-
-        if (expiredSeats.length === 0) return { releasedCount: 0 };
-
-        let releasedCount = 0;
-
-        for (const seat of expiredSeats) {
-            try {
-                if (!seat.currentOccupant) {
-                    // Zombie seat (Occupied status but no user). Just reset it.
-                    seat.status = 'Available';
-                    seat.occupiedSince = null;
-                    seat.expectedEndTime = null;
-                    await seat.save();
-                    continue;
-                }
-
-                const userId = seat.currentOccupant;
-                const checkOutTime = now; // Force checkout at current time (or expected time?)
-
-                let durationMinutes = 0;
-                if (seat.occupiedSince) {
-                    durationMinutes = Math.round((checkOutTime - seat.occupiedSince) / 60000);
-                }
-
-                const bucketDate = new Date(seat.occupiedSince);
-                bucketDate.setHours(0, 0, 0, 0);
-
-                // Close attendance session
-                await Attendance.findOneAndUpdate(
-                    {
-                        userId,
-                        libraryId: seat.libraryId,
-                        date: bucketDate,
-                        "sessions.checkOutTime": null
-                    },
-                    {
-                        $set: {
-                            "sessions.$.checkOutTime": checkOutTime,
-                            "sessions.$.durationMinutes": durationMinutes
-                        },
-                        $inc: { totalDurationToday: durationMinutes }
-                    }
-                );
-
-                // Update User
-                await User.findByIdAndUpdate(userId, { 'studentDetails.assignedSeat': null });
-                authMiddleware.invalidateUserCache(userId);
-
-                // Reset Seat
-                seat.status = 'Available';
-                seat.currentOccupant = null;
-                seat.occupiedSince = null;
-                seat.expectedEndTime = null;
-                await seat.save();
-
-                releasedCount++;
-            } catch (innerErr) {
-                console.error(`Failed to auto-release seat ${seat.seatNumber}:`, innerErr);
-            }
-        }
-
-        return { releasedCount, message: `Released ${releasedCount} expired seats` };
-
-    } catch (err) {
-        console.error("Auto Release Logic Error:", err);
-        throw err; // Re-throw to be caught by the route handler
-    }
-};
-
-exports.releaseExpiredSeats = releaseExpiredSeats; // For Cron
-exports.autoReleaseSeats = async (req, res) => { // For Manual API Trigger
-    try {
-        const result = await releaseExpiredSeats();
-        res.json({ success: true, ...result });
-    } catch (err) {
-        res.status(500).json({ message: "Auto release failed" });
-    }
-};
-
-exports.getAttendanceHistory = async (req, res) => {
-    try {
-        const userId = req.finduser._id;
-
-        // Fetch all attendance records for this user
-        // We now include sessions for the detailed view
-        const history = await Attendance.find(
-            { userId },
-            { date: 1, totalDurationToday: 1, sessionCount: 1, sessions: 1, _id: 0 }
-        ).sort({ date: -1 });
-
-        res.json({
-            success: true,
-            history
-        });
-    } catch (err) {
-        console.error("Get History Error:", err);
-        res.status(500).json({ success: false, msg: "Failed to fetch history" });
-    }
-};
-
-// ==========================================
-// 5. OFFLINE PAYMENT - MANUAL SUBSCRIPTION ACTIVATION
-// ==========================================
-// @desc    Admin/Owner manually activates subscription for a user (Offline Payment)
-// @route   POST /api/entry/activate-subscription-offline
-// @access  Private (Admin/Library Owner)
 exports.activateSubscriptionOffline = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
         const { userId, libraryId, planId, pricePaid, startDate } = req.body;
         const adminId = req.finduser._id;
         const adminRole = req.finduser.role;
 
-        // Validation: Required fields
-        if (!userId || !libraryId || !planId) {
-            return res.status(400).json({
-                success: false,
-                msg: "Missing required fields: userId, libraryId, planId"
-            });
-        }
+        if (!userId || !libraryId || !planId) throw new Error("BAD_REQUEST: Missing required fields");
 
-        // Get Library to verify ownership
-        const library = await Library.findById(libraryId);
-        if (!library) {
-            return res.status(404).json({ success: false, msg: "Library not found" });
-        }
+        const library = await Library.findById(libraryId).session(session);
+        if (!library) throw new Error("NOT_FOUND: Library not found");
 
-        // Authorization: Only Admin or Library Owner can do this
         const isAdmin = adminRole === 'admin' || adminRole === 'co-admin';
-        const isLibraryOwner = adminRole === 'library_owner' &&
-            library.ownerId.toString() === adminId.toString();
+        const isLibraryOwner = adminRole === 'library_owner' && library.ownerId.toString() === adminId.toString();
 
-        if (!isAdmin && !isLibraryOwner) {
-            return res.status(403).json({
-                success: false,
-                msg: "Only admin or library owner can activate subscriptions"
-            });
-        }
+        if (!isAdmin && !isLibraryOwner) throw new Error("FORBIDDEN: Unauthorized");
 
-        // Verify User exists
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ success: false, msg: "User not found" });
-        }
+        const user = await User.findById(userId).session(session);
+        if (!user) throw new Error("NOT_FOUND: User not found");
 
-        // Find Plan (Embedded or Standalone)
         const plan = await resolvePlan(planId, library);
-        if (!plan) {
-            return res.status(404).json({ success: false, msg: "Plan not found" });
-        }
+        if (!plan) throw new Error("NOT_FOUND: Plan not found");
 
-        // Check if user already has active subscription for this library
         const existingActiveSub = await Subscription.findOne({
             userId,
             libraryId,
             status: 'active',
             expiryDate: { $gt: new Date() }
-        });
+        }).session(session);
 
-        if (existingActiveSub) {
-            return res.status(400).json({
-                success: false,
-                msg: "User already has an active subscription for this library"
-            });
-        }
+        if (existingActiveSub) throw new Error("BAD_REQUEST: User already has an active subscription");
 
-        // Calculate Expiry Date
         const subStartDate = startDate ? new Date(startDate) : new Date();
         const expiryDate = new Date(subStartDate);
         expiryDate.setDate(expiryDate.getDate() + plan.durationInDays);
 
-        // Create Subscription
-        const newSub = await Subscription.create({
+        const [newSub] = await Subscription.create([{
             userId,
             libraryId,
             planId: plan._id,
             planName: plan.name || plan.title,
-            pricePaid: pricePaid || plan.price || 0, // Store actual price paid
+            pricePaid: pricePaid || plan.price || 0,
             startDate: subStartDate,
             expiryDate: expiryDate,
             status: 'active',
-            paymentId: `OFFLINE-${Date.now()}` // Track as offline payment
-        });
+            paymentId: `OFFLINE-${Date.now()}`
+        }], { session });
 
-        // Update user's subscription info in studentDetails
         await User.findByIdAndUpdate(
             userId,
             {
@@ -604,29 +460,140 @@ exports.activateSubscriptionOffline = async (req, res) => {
                     }
                 }
             },
-            { new: true }
+            { new: true, session }
         );
 
-        return res.status(201).json({
+        await session.commitTransaction();
+
+        res.status(201).json({
             success: true,
             msg: "Subscription activated successfully (Offline Payment)",
-            subscription: {
-                _id: newSub._id,
-                userId,
-                libraryId,
-                planName: newSub.planName,
-                pricePaid: newSub.pricePaid,
-                startDate: newSub.startDate,
-                expiryDate: newSub.expiryDate,
-                status: newSub.status
-            }
+            subscription: newSub
         });
 
     } catch (err) {
-        console.error("Activate Subscription Offline Error:", err);
-        res.status(500).json({
-            success: false,
-            msg: "Failed to activate subscription"
+        await session.abortTransaction();
+        console.error("Offline Sub Error:", err);
+        const code = err.message.split(':')[0];
+        const msg = err.message.split(': ')[1] || "Failed";
+        
+        if (code === "BAD_REQUEST") return res.status(400).json({ success: false, msg });
+        if (code === "NOT_FOUND") return res.status(404).json({ success: false, msg });
+        if (code === "FORBIDDEN") return res.status(403).json({ success: false, msg });
+        
+        res.status(500).json({ success: false, msg: "Failed to activate subscription" });
+    } finally {
+        session.endSession();
+    }
+};
+
+// ==========================================
+// 6. AUTO-RELEASE CRON JOB
+// ==========================================
+// Keeping this outside transaction for now to avoid locking the entire DB collection
+// Individual seat releases could be transactionalized if strictness is needed.
+const releaseExpiredSeats = async () => {
+    try {
+        const now = new Date();
+        const expiredSeats = await Seat.find({
+            status: 'Occupied',
+            expectedEndTime: { $lt: now }
         });
+
+        if (expiredSeats.length === 0) return { releasedCount: 0 };
+
+        let releasedCount = 0;
+
+        for (const seat of expiredSeats) {
+            const session = await mongoose.startSession();
+            session.startTransaction();
+            try {
+                if (!seat.currentOccupant) {
+                    seat.status = 'Available';
+                    seat.occupiedSince = null;
+                    seat.expectedEndTime = null;
+                    await seat.save({ session });
+                    await session.commitTransaction();
+                    continue;
+                }
+
+                const userId = seat.currentOccupant;
+                const checkOutTime = now;
+
+                let durationMinutes = 0;
+                if (seat.occupiedSince) {
+                    durationMinutes = Math.round((checkOutTime - seat.occupiedSince) / 60000);
+                }
+
+                const bucketDate = new Date(seat.occupiedSince);
+                bucketDate.setHours(0, 0, 0, 0);
+
+                await Attendance.findOneAndUpdate(
+                    {
+                        userId,
+                        libraryId: seat.libraryId,
+                        date: bucketDate,
+                        "sessions.checkOutTime": null
+                    },
+                    {
+                        $set: {
+                            "sessions.$.checkOutTime": checkOutTime,
+                            "sessions.$.durationMinutes": durationMinutes
+                        },
+                        $inc: { totalDurationToday: durationMinutes }
+                    },
+                    { session }
+                );
+
+                await User.findByIdAndUpdate(userId, { 'studentDetails.assignedSeat': null }, { session });
+                authMiddleware.invalidateUserCache(userId);
+
+                await Seat.findByIdAndUpdate(seat._id, {
+                    status: 'Available',
+                    currentOccupant: null,
+                    occupiedSince: null,
+                    expectedEndTime: null
+                }, { session });
+
+                await session.commitTransaction();
+                releasedCount++;
+            } catch (innerErr) {
+                await session.abortTransaction();
+                console.error(`Failed to auto-release seat ${seat.seatNumber}:`, innerErr);
+            } finally {
+                session.endSession();
+            }
+        }
+
+        return { releasedCount, message: `Released ${releasedCount} expired seats` };
+
+    } catch (err) {
+        console.error("Auto Release Logic Error:", err);
+        throw err;
+    }
+};
+
+exports.releaseExpiredSeats = releaseExpiredSeats;
+exports.autoReleaseSeats = async (req, res) => {
+    try {
+        const result = await releaseExpiredSeats();
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(500).json({ message: "Auto release failed" });
+    }
+};
+
+exports.getAttendanceHistory = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const history = await Attendance.find(
+            { userId },
+            { date: 1, totalDurationToday: 1, sessionCount: 1, sessions: 1, _id: 0 }
+        ).sort({ date: -1 });
+
+        res.json({ success: true, history });
+    } catch (err) {
+        console.error("Get History Error:", err);
+        res.status(500).json({ success: false, msg: "Failed to fetch history" });
     }
 };
