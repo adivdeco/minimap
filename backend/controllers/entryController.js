@@ -95,7 +95,7 @@ async function assignSeat(library, userId, subscription, dailyStats, session) {
     }
 
     // 5. Update Attendance Bucket
-    await Attendance.findOneAndUpdate(
+    const attendanceDoc = await Attendance.findOneAndUpdate(
         { userId, libraryId: library._id, date: today },
         {
             $push: {
@@ -127,7 +127,8 @@ async function assignSeat(library, userId, subscription, dailyStats, session) {
                 startDate: subscription.startDate,
                 expiryDate: subscription.expiryDate,
                 status: 'active'
-            }
+            },
+            $addToSet: { attendanceHistory: attendanceDoc._id }
         }
     }, { session: session });
 
@@ -189,10 +190,10 @@ exports.checkIn = async (req, res) => {
 
         // --- SCENARIO B: NO SUBSCRIPTION (READ-ONLY Logic) ---
         // We abort transaction here because we are just showing plans, not writing data
-        await session.abortTransaction(); 
-        
+        await session.abortTransaction();
+
         const history = await Subscription.exists({ userId, libraryId: library._id }); // No session needed now
-        
+
         if (history) {
             return res.status(200).json({
                 success: false,
@@ -286,7 +287,7 @@ exports.activateTrial = async (req, res) => {
 
         if (err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ msg: err.message.split(': ')[1] });
         if (err.message.startsWith("NOT_FOUND:")) return res.status(404).json({ msg: err.message.split(': ')[1] });
-        
+
         res.status(500).json({ msg: "Failed to activate trial" });
     } finally {
         session.endSession();
@@ -308,7 +309,7 @@ exports.checkOut = async (req, res) => {
         if (!seat) throw new Error("BAD_REQUEST: You are not currently checked in.");
 
         const checkOutTime = new Date();
-        
+
         // 2. Calculate Duration
         let durationMinutes = 0;
         if (seat.occupiedSince) {
@@ -354,7 +355,7 @@ exports.checkOut = async (req, res) => {
 
         // 6. Get Updated Stats for Response (Within Session)
         const dailyStats = await getDailyStats(userId, seat.libraryId, session);
-        
+
         // Get subscription for limits
         const activeSub = await Subscription.findOne({
             userId,
@@ -364,7 +365,7 @@ exports.checkOut = async (req, res) => {
 
         let hoursPerDay = 5;
         if (activeSub) {
-            const planDoc = await resolvePlan(activeSub.planId, { _id: seat.libraryId }); 
+            const planDoc = await resolvePlan(activeSub.planId, { _id: seat.libraryId });
             if (planDoc && planDoc.hoursPerDay) hoursPerDay = planDoc.hoursPerDay;
         }
 
@@ -386,7 +387,7 @@ exports.checkOut = async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         console.error("CheckOut Error:", err);
-        if(err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ msg: err.message.split(': ')[1] });
+        if (err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ msg: err.message.split(': ')[1] });
         res.status(500).json({ msg: "Server Error during checkout" });
     } finally {
         session.endSession();
@@ -476,11 +477,11 @@ exports.activateSubscriptionOffline = async (req, res) => {
         console.error("Offline Sub Error:", err);
         const code = err.message.split(':')[0];
         const msg = err.message.split(': ')[1] || "Failed";
-        
+
         if (code === "BAD_REQUEST") return res.status(400).json({ success: false, msg });
         if (code === "NOT_FOUND") return res.status(404).json({ success: false, msg });
         if (code === "FORBIDDEN") return res.status(403).json({ success: false, msg });
-        
+
         res.status(500).json({ success: false, msg: "Failed to activate subscription" });
     } finally {
         session.endSession();
@@ -586,12 +587,42 @@ exports.autoReleaseSeats = async (req, res) => {
 exports.getAttendanceHistory = async (req, res) => {
     try {
         const userId = req.finduser._id;
+
+        // 1. Try Optimized Fetch
+        const user = await User.findById(userId)
+            .populate({
+                path: 'attendanceHistory',
+                select: 'date totalDurationToday sessionCount sessions -_id',
+                options: { sort: { date: -1 } }
+            })
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ success: false, msg: "User not found" });
+        }
+
+        // 2. Check if Optimized Data Exists
+        if (user.attendanceHistory && user.attendanceHistory.length > 0) {
+            return res.json({ success: true, history: user.attendanceHistory });
+        }
+
+        // 3. Fallback: Legacy Fetch (If optimized field is empty but user might have old data)
         const history = await Attendance.find(
             { userId },
-            { date: 1, totalDurationToday: 1, sessionCount: 1, sessions: 1, _id: 0 }
+            { date: 1, totalDurationToday: 1, sessionCount: 1, sessions: 1 }
         ).sort({ date: -1 });
 
+        // 4. Self-Healing: Update User Record (Lazy Migration)
+        if (history.length > 0) {
+            const attendanceIds = history.map(h => h._id);
+            // We use $addToSet to avoid duplicates if some IDs were already there
+            await User.findByIdAndUpdate(userId, {
+                $addToSet: { attendanceHistory: { $each: attendanceIds } }
+            });
+        }
+
         res.json({ success: true, history });
+
     } catch (err) {
         console.error("Get History Error:", err);
         res.status(500).json({ success: false, msg: "Failed to fetch history" });

@@ -103,16 +103,12 @@ const userSchema = new Schema({
         language: { type: String, default: 'en' },
         theme: { type: String, enum: ['light', 'dark'], default: 'light' }
     },
-    
-    attendenceCollection: {
-     type: [{
-        atdc: {
-            type: Schema.Types.ObjectId,
-            ref: 'Attendence'
-        }
-     }]
-    },
-       
+
+    attendanceHistory: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Attendance'
+    }],
+
     // --- 6. Technical Fields ---
     avatar: { type: String, default: '' },
     auth0Id: { type: String, sparse: true, unique: true },
