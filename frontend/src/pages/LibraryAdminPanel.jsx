@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
@@ -7,21 +7,16 @@ import UserSubscriptionManagement from '../components/UserSubscriptionManagement
 import { toast } from 'react-toastify';
 import { Settings, Users, DollarSign, ArrowLeft } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
-
-// =====================================================
-// LIBRARY ADMIN PANEL
-// =====================================================
-// For owners/admins to manage plans, users, subscriptions
+import { motion, AnimatePresence } from 'framer-motion';
 
 const LibraryAdminPanel = () => {
     const { id: libraryId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    
     const [activeTab, setActiveTab] = useState('subscriptions');
-    const [library, setLibrary] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Check if user has permission
     const canAccess = user?.role === 'admin' || user?.role === 'co-admin' || user?.role === 'library_owner';
 
     useEffect(() => {
@@ -30,26 +25,21 @@ const LibraryAdminPanel = () => {
             navigate('/');
             return;
         }
-        // Load library details if needed
         setLoading(false);
-    }, []);
+    }, [canAccess, navigate]);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen bg-gray-50 dark:bg-[#050505]">
                 <Navbar />
-                <div className="flex items-center justify-center h-96">
-                    <div className="text-center">
-                    <LoadingSpinner/>
-                    </div>
+                <div className="flex items-center justify-center h-[60vh]">
+                    <LoadingSpinner />
                 </div>
             </div>
         );
     }
 
-    if (!canAccess) {
-        return null;
-    }
+    if (!canAccess) return null;
 
     const tabs = [
         { id: 'subscriptions', label: 'User Subscriptions', icon: Users },
@@ -57,56 +47,67 @@ const LibraryAdminPanel = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#050505] transition-colors duration-300">
             <Navbar />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Header */}
-                <div className="mb-8">
+                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
                     <button
                         onClick={() => navigate(-1)}
-                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4 transition"
+                        className="flex items-center gap-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 mb-4 transition-colors font-medium text-sm"
                     >
-                        <ArrowLeft size={20} />
-                        Back
+                        <ArrowLeft size={16} /> Back to Dashboard
                     </button>
                     <div className="flex items-center gap-3">
-                        <Settings className="text-blue-600" size={32} />
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Library Admin Panel</h1>
+                        <div className="p-2.5 bg-blue-600/10 dark:bg-blue-500/20 rounded-xl">
+                            <Settings className="text-blue-600 dark:text-blue-400" size={28} />
+                        </div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Library Admin Panel</h1>
                     </div>
-                    <p className="text-gray-600 dark:text-gray-400 mt-2">Manage your library's subscriptions and plans</p>
+                </motion.div>
+
+                {/* Modern Tabs */}
+                <div className="bg-white dark:bg-[#0F0F12] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 mb-8 overflow-hidden p-1.5 flex gap-1 w-fit">
+                    {tabs.map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors z-10 ${
+                                    isActive ? 'text-blue-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="admin-active-tab"
+                                        className="absolute inset-0 bg-blue-50 dark:bg-white/10 rounded-xl -z-10"
+                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                    />
+                                )}
+                                <Icon size={18} />
+                                {tab.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
-                {/* Tabs */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 border-b dark:border-gray-700">
-                    <div className="flex flex-wrap">
-                        {tabs.map((tab) => {
-                            const Icon = tab.icon;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-6 py-4 font-medium border-b-2 transition ${activeTab === tab.id
-                                        ? 'text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-400'
-                                        : 'text-gray-600 border-transparent hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                                        }`}
-                                >
-                                    <Icon size={20} />
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Tab Content */}
-                <div>
-                    {activeTab === 'subscriptions' && (
-                        <UserSubscriptionManagement libraryId={libraryId} />
-                    )}
-                    {activeTab === 'plans' && (
-                        <PlanManagement libraryId={libraryId} />
-                    )}
+                {/* Tab Content Area */}
+                <div className="relative">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={activeTab}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            {activeTab === 'subscriptions' && <UserSubscriptionManagement libraryId={libraryId} />}
+                            {activeTab === 'plans' && <PlanManagement libraryId={libraryId} />}
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
             </div>
         </div>

@@ -4,35 +4,29 @@ import { activateSubscriptionOffline } from '../api/entry';
 import { getLibraryPlans } from '../api/plan';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
-import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User } from 'lucide-react';
-
-// =====================================================
-// USER SUBSCRIPTION MANAGEMENT - FOR OFFLINE PAYMENTS
-// =====================================================
-// Admin/Library Owner can manually activate subscriptions for users
-// (For cash/offline payments)
+import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const UserSubscriptionManagement = ({ libraryId }) => {
     const { user: currentUser } = useAuth();
 
-    // State
     const [users, setUsers] = useState([]);
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // Modal & Form State
     const [showModal, setShowModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const [activatingId, setActivatingId] = useState(null);
     const [subscriptionForm, setSubscriptionForm] = useState({
         planId: '',
         pricePaid: '',
         startDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'cash'
     });
-    const [activatingId, setActivatingId] = useState(null);
 
-    // Check authorization
-    const canManageSubscriptions = currentUser?.role === 'admin' ||
-        currentUser?.role === 'library_owner';
+    const canManageSubscriptions = currentUser?.role === 'admin' || currentUser?.role === 'library_owner';
 
     useEffect(() => {
         if (libraryId && canManageSubscriptions) {
@@ -41,44 +35,37 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         }
     }, [libraryId, canManageSubscriptions]);
 
-    // Fetch users in library
+    // Auto-fill price when a plan is selected
+    useEffect(() => {
+        if (subscriptionForm.planId && plans.length > 0) {
+            const selectedPlan = plans.find(p => p._id === subscriptionForm.planId);
+            if (selectedPlan) {
+                setSubscriptionForm(prev => ({ ...prev, pricePaid: selectedPlan.price }));
+            }
+        }
+    }, [subscriptionForm.planId, plans]);
+
     const fetchLibraryUsers = async () => {
         try {
             setLoading(true);
-            // Get all users and filter by library subscriptions/access
             const response = await axiosClient.get(`/library/${libraryId}/users`);
-
-            // Backend returns { users: [...], ... } with a custom structure
             const rawUsers = response.data?.users || (Array.isArray(response.data) ? response.data : []);
 
-            // Map the response to match the User model structure expected by the component
             const mappedUsers = rawUsers.map(u => {
-                // If it's already in the expected format (has _id and name), return as is
                 if (u._id && u.name) return u;
-
-                // Otherwise map from the specific getLibraryUsers structure
                 return {
                     _id: u.userId,
                     name: u.userName,
                     email: u.email,
                     phone: u.phone,
-                    // Map subscription details to studentDetails.currentSubscription
-                    studentDetails: {
-                        currentSubscription: u.subscription
-                    },
-                    // Preserve other fields
+                    studentDetails: { currentSubscription: u.subscription },
                     ...u
                 };
             });
-
             setUsers(mappedUsers);
         } catch (error) {
-            console.error("Error fetching users:", error);
-            // Fallback: try to get all users
             try {
-                // Correct endpoint based on authRoutes.js: /api/auth/users
                 const allUsersResponse = await axiosClient.get('/auth/users').catch(() => null);
-
                 if (allUsersResponse) {
                     const fallbackList = allUsersResponse.data?.users || (Array.isArray(allUsersResponse.data) ? allUsersResponse.data : []);
                     setUsers(fallbackList);
@@ -86,7 +73,6 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                     setUsers([]);
                 }
             } catch (err) {
-                console.error("Fallback fetch failed", err);
                 toast.error("Failed to load users");
                 setUsers([]);
             }
@@ -95,18 +81,15 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         }
     };
 
-    // Fetch available plans
     const fetchPlans = async () => {
         try {
             const response = await getLibraryPlans(libraryId);
             setPlans(response);
         } catch (error) {
-            console.error("Error fetching plans:", error);
             toast.error("Failed to load plans");
         }
     };
 
-    // Open modal for subscription activation
     const openActivationModal = (user) => {
         setSelectedUser(user);
         setSubscriptionForm({
@@ -118,32 +101,18 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         setShowModal(true);
     };
 
-    // Handle subscription form change
     const handleFormChange = (e) => {
         const { name, value } = e.target;
-        setSubscriptionForm(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setSubscriptionForm(prev => ({ ...prev, [name]: value }));
     };
 
-    // Activate subscription offline
     const handleActivateSubscription = async (e) => {
         e.preventDefault();
-
-        if (!subscriptionForm.planId) {
-            toast.error("Please select a plan");
-            return;
-        }
-
-        if (!subscriptionForm.pricePaid && subscriptionForm.pricePaid !== 0) {
-            toast.error("Please enter price paid");
-            return;
-        }
+        if (!subscriptionForm.planId) return toast.error("Please select a plan");
+        if (!subscriptionForm.pricePaid && subscriptionForm.pricePaid !== 0) return toast.error("Please enter price paid");
 
         try {
             setActivatingId(selectedUser._id);
-
             const response = await activateSubscriptionOffline(
                 selectedUser._id,
                 libraryId,
@@ -155,19 +124,17 @@ const UserSubscriptionManagement = ({ libraryId }) => {
             if (response.success) {
                 toast.success(`Subscription activated for ${selectedUser.name}`);
                 setShowModal(false);
-                fetchLibraryUsers(); // Refresh list
+                fetchLibraryUsers();
             } else {
                 toast.error(response.msg || "Failed to activate subscription");
             }
         } catch (error) {
-            console.error("Error activating subscription:", error);
             toast.error(error.response?.data?.msg || "Failed to activate subscription");
         } finally {
             setActivatingId(null);
         }
     };
 
-    // Filter users
     const filteredUsers = users.filter(user =>
         user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -176,111 +143,100 @@ const UserSubscriptionManagement = ({ libraryId }) => {
 
     if (!canManageSubscriptions) {
         return (
-            <div className="p-6 bg-red-50 border border-red-200 rounded-lg text-center">
-                <p className="text-red-700">
-                    You don't have permission to manage subscriptions. Only admins and library owners can access this.
-                </p>
+            <div className="p-6 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl text-center">
+                <p className="text-red-700 dark:text-red-400 font-medium">You don't have permission to manage subscriptions.</p>
             </div>
         );
     }
 
     return (
-        <div className="w-full p-6">
+        <div className="w-full">
             {/* Header */}
-            <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <User size={28} className="text-blue-600" />
-                    Manual Subscription Activation (Offline Payment)
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mt-2">Activate subscriptions for users who paid offline/cash</p>
-            </div>
+            <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 tracking-tight">
+                        <User size={24} className="text-blue-600 dark:text-blue-400" />
+                        Manual Subscription Setup
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Activate plans for members paying offline or in cash.</p>
+                </div>
 
-            {/* Search Bar */}
-            <div className="mb-6 flex gap-4">
-                <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+                <div className="relative w-full md:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                         type="text"
-                        placeholder="Search by name, email, or phone..."
+                        placeholder="Search members..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm transition-all"
                     />
                 </div>
             </div>
 
-            {/* Users Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            {/* Table */}
+            <div className="bg-white dark:bg-[#0F0F12] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 overflow-hidden">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-500">Loading users...</div>
+                    <div className="p-12 flex flex-col items-center justify-center text-gray-500">
+                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="font-medium">Loading members...</p>
+                    </div>
                 ) : filteredUsers.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">
-                        {users.length === 0 ? 'No users found' : 'No matching users found'}
+                    <div className="p-12 text-center">
+                        <User className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+                        <p className="text-gray-500 dark:text-gray-400 font-medium">No members found matching your search.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                            <thead className="bg-gray-50 dark:bg-white/5">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Email</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Phone</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Current Subscription</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Member</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contact</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                                 {filteredUsers.map((user) => {
                                     const subscription = user.studentDetails?.currentSubscription;
-                                    const isActive = subscription?.status === 'active' &&
-                                        new Date(subscription.expiryDate) > new Date();
+                                    const isActive = subscription?.status === 'active' && new Date(subscription.expiryDate) > new Date();
 
                                     return (
-                                        <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                        <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
+                                                <div className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                                    <Mail size={16} />
-                                                    {user.email}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                                    <Phone size={16} />
-                                                    {user.phone || 'N/A'}
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400"><Mail size={14} />{user.email}</span>
+                                                    {user.phone && <span className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400"><Phone size={14} />{user.phone}</span>}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 {isActive ? (
-                                                    <div>
-                                                        <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full flex items-center gap-1 w-fit">
-                                                            <Clock size={14} />
-                                                            Active
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="px-2.5 py-1 bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1.5 w-fit border border-green-200 dark:border-green-500/20">
+                                                            <Clock size={12} /> Active
                                                         </span>
-                                                        <div className="text-xs text-gray-500 mt-1">
-                                                            Expires: {new Date(subscription.expiryDate).toLocaleDateString()}
-                                                        </div>
+                                                        <span className="text-[11px] text-gray-500">Exp: {new Date(subscription.expiryDate).toLocaleDateString()}</span>
                                                     </div>
                                                 ) : (
-                                                    <span className="px-3 py-1 bg-gray-100 text-gray-800 text-sm font-medium rounded-full">
-                                                        No Active Subscription
+                                                    <span className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider rounded-md border border-gray-200 dark:border-gray-700">
+                                                        No Active Plan
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
                                                 {!isActive ? (
                                                     <button
                                                         onClick={() => openActivationModal(user)}
                                                         disabled={activatingId === user._id}
-                                                        className="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-400 transition"
+                                                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
                                                     >
-                                                        <Plus size={16} />
-                                                        {activatingId === user._id ? 'Activating...' : 'Activate'}
+                                                        <Plus size={14} /> {activatingId === user._id ? 'Processing...' : 'Assign Plan'}
                                                     </button>
                                                 ) : (
-                                                    <span className="text-sm text-gray-500">Active</span>
+                                                    <span className="text-sm font-medium text-gray-400 dark:text-gray-500 mr-4">Up to date</span>
                                                 )}
                                             </td>
                                         </tr>
@@ -292,112 +248,112 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                 )}
             </div>
 
-            {/* Activation Modal */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                            Activate Subscription
-                        </h3>
-                        <p className="text-gray-600 dark:text-gray-300 mb-6">
-                            For: <strong>{selectedUser?.name}</strong> ({selectedUser?.email})
-                        </p>
-
-                        <form onSubmit={handleActivateSubscription} className="space-y-4">
-                            {/* Plan Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Select Plan *
-                                </label>
-                                <select
-                                    name="planId"
-                                    value={subscriptionForm.planId}
-                                    onChange={handleFormChange}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    required
-                                >
-                                    <option value="">-- Choose a plan --</option>
-                                    {plans.map(plan => (
-                                        <option key={plan._id} value={plan._id}>
-                                            {plan.name} - ${plan.price} ({plan.durationInDays} days)
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Price Paid */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    <DollarSign className="inline mr-1" size={16} />
-                                    Price Paid *
-                                </label>
-                                <input
-                                    type="number"
-                                    name="pricePaid"
-                                    value={subscriptionForm.pricePaid}
-                                    onChange={handleFormChange}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    min="0"
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    required
-                                />
-                            </div>
-
-                            {/* Start Date */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    <Calendar className="inline mr-1" size={16} />
-                                    Start Date
-                                </label>
-                                <input
-                                    type="date"
-                                    name="startDate"
-                                    value={subscriptionForm.startDate}
-                                    onChange={handleFormChange}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                />
-                            </div>
-
-                            {/* Payment Method */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Payment Method
-                                </label>
-                                <select
-                                    name="paymentMethod"
-                                    value={subscriptionForm.paymentMethod}
-                                    onChange={handleFormChange}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                >
-                                    <option value="cash">Cash</option>
-                                    <option value="cheque">Cheque</option>
-                                    <option value="bank_transfer">Bank Transfer</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-
-                            {/* Buttons */}
-                            <div className="flex gap-3 mt-6">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                                >
-                                    Cancel
+            {/* Modal */}
+            <AnimatePresence>
+                {showModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0 }} 
+                            animate={{ scale: 1, opacity: 1 }} 
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white dark:bg-[#18181b] rounded-3xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-white/10 overflow-hidden"
+                        >
+                            <div className="bg-gray-50 dark:bg-white/5 p-6 border-b border-gray-100 dark:border-white/5 relative">
+                                <button onClick={() => setShowModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
+                                    <X size={20} />
                                 </button>
-                                <button
-                                    type="submit"
-                                    disabled={activatingId === selectedUser?._id}
-                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition font-medium"
-                                >
-                                    {activatingId === selectedUser?._id ? 'Activating...' : 'Activate Subscription'}
-                                </button>
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Activate Plan</h3>
+                                <p className="text-sm text-gray-500 mt-1">Assigning subscription to <strong className="text-gray-800 dark:text-gray-200">{selectedUser?.name}</strong></p>
                             </div>
-                        </form>
+
+                            <form onSubmit={handleActivateSubscription} className="p-6 space-y-5">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Select Plan *</label>
+                                    <select
+                                        name="planId"
+                                        value={subscriptionForm.planId}
+                                        onChange={handleFormChange}
+                                        className="w-full px-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white appearance-none cursor-pointer"
+                                        required
+                                    >
+                                        <option value="">-- Choose a package --</option>
+                                        {plans.map(plan => (
+                                            <option key={plan._id} value={plan._id}>
+                                                {plan.name} - ₹{plan.price} ({plan.durationInDays} days)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Price Paid *</label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="number"
+                                                name="pricePaid"
+                                                value={subscriptionForm.pricePaid}
+                                                onChange={handleFormChange}
+                                                placeholder="0.00"
+                                                step="0.01"
+                                                min="0"
+                                                className="w-full pl-9 pr-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Start Date</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="date"
+                                                name="startDate"
+                                                value={subscriptionForm.startDate}
+                                                onChange={handleFormChange}
+                                                className="w-full pl-9 pr-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Payment Method</label>
+                                    <select
+                                        name="paymentMethod"
+                                        value={subscriptionForm.paymentMethod}
+                                        onChange={handleFormChange}
+                                        className="w-full px-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white appearance-none"
+                                    >
+                                        <option value="cash">Cash</option>
+                                        <option value="upi">UPI/QR Code</option>
+                                        <option value="bank_transfer">Bank Transfer</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowModal(false)}
+                                        className="flex-1 py-3 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-white/10 transition-colors font-medium text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={activatingId === selectedUser?._id}
+                                        className="flex-[2] py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors font-bold text-sm shadow-md"
+                                    >
+                                        {activatingId === selectedUser?._id ? 'Processing...' : 'Confirm Activation'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
                     </div>
-                </div>
-            )}
+                )}
+            </AnimatePresence>
         </div>
     );
 };

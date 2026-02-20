@@ -87,9 +87,6 @@ const MyLibraries = () => {
                         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
                             My <span className="text-indigo-600 dark:text-indigo-400">Libraries</span>
                         </h1>
-                        <p className="text-gray-500 dark:text-gray-400 text-base md:text-lg">
-                            Manage your branches, track performance, and update details.
-                        </p>
                     </motion.div>
 
                     <motion.div
@@ -238,7 +235,7 @@ const MyLibraries = () => {
                                             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
                                         >
                                             <Users size={18} />
-                                            <span>All Users & Subs</span>
+                                            <span>All Users & Attendence History</span>
                                             <ArrowUpRight size={16} className="opacity-60" />
                                         </button>
 
@@ -247,7 +244,7 @@ const MyLibraries = () => {
                                             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
                                         >
                                             <Users size={18} />
-                                            <span>Edit Subs</span>
+                                            <span>Edit Subs & plans</span>
                                             <ArrowUpRight size={16} className="opacity-60" />
                                         </button>
 

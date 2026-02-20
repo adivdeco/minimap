@@ -1039,15 +1039,21 @@ const getUserAnalytics = async (req, res) => {
 
         // Fetch subscription data
         const Subscription = require('../models/Subscription');
-        const subscription = await Subscription.findOne({
+        const subscriptions = await Subscription.find({
             userId,
             libraryId
-        });
+        }).sort({ createdAt: -1 });
 
-        if (!subscription) {
+        if (!subscriptions || subscriptions.length === 0) {
             return res.status(404).json({
                 message: "This user has no subscription in this library"
             });
+        }
+
+        // Determine the "current" subscription (prioritize active, otherwise use the latest)
+        let currentSubscription = subscriptions.find(sub => sub.status === 'active');
+        if (!currentSubscription) {
+            currentSubscription = subscriptions[0]; // fallback to the most recent one
         }
 
         // Fetch all attendance records for this user
@@ -1087,7 +1093,21 @@ const getUserAnalytics = async (req, res) => {
             .slice(0, 10);
 
         // Plan details
-        const planDetails = library.plans.find(p => p._id.toString() === subscription.planId.toString());
+        const planDetails = library.plans.find(p => p._id.toString() === currentSubscription.planId.toString());
+
+        // Format subscription history
+        const subscriptionHistory = subscriptions.map(sub => {
+            const plan = library.plans.find(p => p._id.toString() === sub.planId.toString());
+            return {
+                _id: sub._id,
+                planName: sub.planName || plan?.name || 'Unknown Plan',
+                planId: sub.planId,
+                startDate: sub.startDate,
+                expiryDate: sub.expiryDate,
+                status: sub.status,
+                pricePaid: sub.pricePaid
+            };
+        });
 
         res.status(200).json({
             message: "User analytics retrieved successfully",
@@ -1100,16 +1120,17 @@ const getUserAnalytics = async (req, res) => {
                 joinedAt: user.createdAt
             },
             subscription: {
-                planName: subscription.planName,
-                planId: subscription.planId,
-                startDate: subscription.startDate,
-                expiryDate: subscription.expiryDate,
-                status: subscription.status,
-                pricePaid: subscription.pricePaid,
-                daysRemaining: subscription.status === 'active'
-                    ? Math.ceil((new Date(subscription.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
+                planName: currentSubscription.planName || planDetails?.name || 'Unknown',
+                planId: currentSubscription.planId,
+                startDate: currentSubscription.startDate,
+                expiryDate: currentSubscription.expiryDate,
+                status: currentSubscription.status,
+                pricePaid: currentSubscription.pricePaid,
+                daysRemaining: currentSubscription.status === 'active'
+                    ? Math.ceil((new Date(currentSubscription.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
                     : 0
             },
+            subscriptionHistory,
             planDetails: {
                 name: planDetails?.name || 'Unknown',
                 hoursPerDay: planDetails?.hoursPerDay || 5,
