@@ -1,7 +1,11 @@
 const User = require('../models/User');
+const PendingUser = require('../models/PendingUser');
 const bcrypt = require('bcryptjs');
 const validateuser = require('../utils/validators');
 const jwt = require('jsonwebtoken');
+
+const { sendVerificationEmail } = require('../utils/emailService');
+const crypto = require('crypto');
 
 const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 const JWT_EXPIRY = 60 * 60 * 24 * 7; // ~16 days
@@ -17,7 +21,7 @@ const getCookieOptions = () => {
         path: '/'
     };
 };
-
+[]
 // @desc    Register new user
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
@@ -35,38 +39,102 @@ const registerUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const user = await User.create({
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Store in PendingUser collection
+        await PendingUser.deleteOne({ email }); // Clear invalid/expired attempts
+
+        await PendingUser.create({
             name,
             email,
             password: hashedPassword,
-            role: 'User',
-            loginProvider: 'local',
+            otp,
+            otpExpiry: new Date(Date.now() + 10 * 60 * 1000), // redundant with TTL but good for logic
             avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`
         });
 
-        const token = jwt.sign(
-            { userId: user._id, email: email, role: user.role },
-            JWT_SECRET,
-            { expiresIn: JWT_EXPIRY }
-        );
-
-        // Cookie options
-        const options = getCookieOptions();
-        res.cookie('token', token, options);
+        // Send OTP via email
+        try {
+            await sendVerificationEmail(email, otp);
+        } catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+        }
 
         res.status(200).json({
-            user: {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role
-            },
-            message: "Registration successful"
+            success: true,
+            message: "OTP sent to email. Please verify to complete registration.",
+            email: email
         });
 
     } catch (error) {
         console.error('Error in registerUser:', error);
         res.status(500).json({ message: error.message || 'Internal server error' });
+    }
+};
+
+// @desc    Verify Email OTP
+// @route   POST /api/auth/verify-email
+const verifyEmail = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({ message: "Email and OTP are required" });
+        }
+
+        const pendingUser = await PendingUser.findOne({ email });
+
+        if (!pendingUser) {
+            return res.status(400).json({ message: "Registration session expired or invalid. Please register again." });
+        }
+
+        if (pendingUser.otp !== otp) {
+            return res.status(400).json({ message: "Invalid OTP" });
+        }
+
+        // Create actual User
+        const user = await User.create({
+            name: pendingUser.name,
+            email: pendingUser.email,
+            password: pendingUser.password,
+            role: 'User',
+            loginProvider: 'local',
+            avatar: pendingUser.avatar,
+            emailVerified: true
+        });
+
+        // Delete pending record
+        await PendingUser.deleteOne({ email });
+
+        // Generate Token
+        const token = jwt.sign(
+            { userId: user._id, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRY }
+        );
+
+        const options = getCookieOptions();
+        res.cookie('token', token, options);
+
+        res.status(200).json({
+            success: true,
+            message: "Email verified & Account created successfully",
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                avatar: user.avatar
+            }
+        });
+
+    } catch (error) {
+        console.error('Error in verifyEmail:', error);
+        if (error.code === 11000) {
+            return res.status(400).json({ message: "Email already registered." });
+        }
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
@@ -105,6 +173,24 @@ const loginUser = async (req, res) => {
                 success: false,
                 error: "No account found with this email",
                 field: "email"
+            });
+        }
+
+        // Check verification status (skip for admins/pre-verified users if needed, 
+        // but strictly enforcing it for security)
+        // Feature implementation date approx: 2026-02-19T22:00:00.000Z
+        const VERIFICATION_CUTOFF_DATE = new Date('2026-02-19T22:00:00.000Z');
+
+        if (
+            (user.loginProvider === 'local' || user.loginProvider === 'email') &&
+            !user.emailVerified &&
+            (user.createdAt && new Date(user.createdAt) > VERIFICATION_CUTOFF_DATE)
+        ) {
+            return res.status(403).json({
+                success: false,
+                error: "Email not verified. Please verify your email.",
+                notVerified: true, // Flag for frontend
+                email: email
             });
         }
 
@@ -551,5 +637,6 @@ module.exports = {
     updateUser,
     deleteUser,
     updateProfile,
-    changePassword
+    changePassword,
+    verifyEmail
 };

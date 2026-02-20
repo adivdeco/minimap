@@ -120,6 +120,19 @@ const Navbar = () => {
                                         <CalendarDays size={18} />
                                     </button>
                                 )}
+                                   <button
+                                    onClick={() => navigate('/profile')}
+                                    className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer group"
+                                >
+                                    {user?.avatar ? (
+                                        <img src={user.avatar} alt="Profile" className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold shadow-inner text-white">
+                                            {user?.name?.charAt(0)?.toUpperCase()}
+                                        </div>
+                                    )}
+                                   
+                                </button>
                             </div>
                         </motion.div>
                     </div>

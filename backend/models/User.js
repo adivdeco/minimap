@@ -115,6 +115,9 @@ const userSchema = new Schema({
     loginProvider: { type: String, enum: ['email', 'google', 'facebook', 'local'], default: 'email' },
     fcmToken: { type: String }, // Important for "Subscription Expiring" alerts
 
+    // --- 7. Email Verification ---
+    emailVerified: { type: Boolean, default: false }
+
 }, { timestamps: true });
 
 // Helper: Ensure only one address is default

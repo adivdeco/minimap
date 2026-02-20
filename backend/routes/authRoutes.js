@@ -10,13 +10,15 @@ const {
     updateUser,
     deleteUser,
     updateProfile,
-    changePassword
+    changePassword,
+    verifyEmail
 } = require('../controllers/authController');
 const { authLimiter } = require('../middleware/rateLimiter');
 const authMiddleware = require('../middleware/authMiddleware');
 
 // Public routes
 router.post('/register', authLimiter, registerUser);
+router.post('/verify-email', authLimiter, verifyEmail);
 router.post('/login', authLimiter, loginUser);
 router.post('/google', authLimiter, socialLogin);
 router.post('/logout', logoutUser);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { register as apiRegister, googleAuth } from '../../api/auth';
+import { register as apiRegister, verifyEmail, googleAuth } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
 import { useAuth0 } from '@auth0/auth0-react';
 import { motion } from 'framer-motion';
@@ -12,6 +12,8 @@ const Register = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [otp, setOtp] = useState('');
+    const [step, setStep] = useState(1); // 1: Details, 2: OTP
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -21,29 +23,50 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-
-        if (password !== confirmPassword) {
-            setError('Passwords do not match');
-            return;
-        }
-
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters');
-            return;
-        }
-
         setLoading(true);
 
         try {
-            const response = await apiRegister(name, email, password);
-            if (response.user) {
-                login(response.user);
-                navigate('/');
+            if (step === 1) {
+                // Step 1: Register and get OTP
+                if (password !== confirmPassword) {
+                    setError('Passwords do not match');
+                    setLoading(false);
+                    return;
+                }
+
+                if (password.length < 6) {
+                    setError('Password must be at least 6 characters');
+                    setLoading(false);
+                    return;
+                }
+
+                const response = await apiRegister(name, email, password);
+                if (response.success) {
+                    setStep(2);
+                    // Don't login yet, wait for OTP
+                } else {
+                    setError(response.message || 'Registration failed');
+                }
             } else {
-                setError(response.message || 'Registration failed');
+                // Step 2: Verify OTP
+                if (otp.length !== 6) {
+                    setError('Please enter a valid 6-digit OTP');
+                    setLoading(false);
+                    return;
+                }
+
+                // Call verify email API
+                const response = await verifyEmail(email, otp);
+
+                if (response.success && response.user) {
+                    login(response.user);
+                    navigate('/');
+                } else {
+                    setError(response.message || 'Verification failed');
+                }
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed');
+            setError(err.response?.data?.message || 'Action failed');
         } finally {
             setLoading(false);
         }
@@ -51,8 +74,8 @@ const Register = () => {
 
     return (
         <AuthLayout
-            title="Welcome"
-            subtitle="Create your account"
+            title={step === 1 ? "Welcome" : "Verify Email"}
+            subtitle={step === 1 ? "Create your account" : `Enter OTP sent to ${email}`}
         >
             {/* Error Message */}
             {error && (
@@ -67,92 +90,116 @@ const Register = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                >
-                    <button
-                        type="button"
-                        onClick={() => loginWithRedirect({ authorizationParams: { screen_hint: 'signup' } })}
-                        className="w-full py-2.5 px-4 bg-[#1C1F26] hover:bg-[#252932] border border-slate-800 rounded-md text-slate-200 font-medium transition-all duration-200 flex items-center justify-center gap-2 group hover:border-slate-700 hover:text-white"
-                    >
-                        <img src="https://cdn.auth0.com/styleguide/components/1.0.8/media/logos/img/badge.png" alt="Auth0" className="w-4 h-4 opacity-80 group-hover:opacity-100 transition-opacity" />
-                        <span className="text-sm">Sign up with Google</span>
-                    </button>
-                </motion.div>
+                {step === 1 ? (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 }}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => loginWithRedirect({ authorizationParams: { screen_hint: 'signup' } })}
+                                className="w-full py-2.5 px-4 bg-[#1C1F26] hover:bg-[#252932] border border-slate-800 rounded-md text-slate-200 font-medium transition-all duration-200 flex items-center justify-center gap-2 group hover:border-slate-700 hover:text-white"
+                            >
+                                <img src="https://cdn.auth0.com/styleguide/components/1.0.8/media/logos/img/badge.png" alt="Auth0" className="w-4 h-4 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                <span className="text-sm">Sign up with Google</span>
+                            </button>
+                        </motion.div>
 
-                <div className="flex items-center gap-3 my-6">
-                    <div className="h-px bg-slate-800 flex-1" />
-                    <span className="text-slate-600 text-xs font-medium uppercase tracking-wider">Or</span>
-                    <div className="h-px bg-slate-800 flex-1" />
-                </div>
+                        <div className="flex items-center gap-3 my-6">
+                            <div className="h-px bg-slate-800 flex-1" />
+                            <span className="text-slate-600 text-xs font-medium uppercase tracking-wider">Or</span>
+                            <div className="h-px bg-slate-800 flex-1" />
+                        </div>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
-                    <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Full Name</label>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
-                        placeholder="John Doe"
-                        required
-                    />
-                </motion.div>
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                        >
+                            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Full Name</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
+                                placeholder="John Doe"
+                                required
+                            />
+                        </motion.div>
 
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                >
-                    <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Work Email</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
-                        placeholder="name@company.com"
-                        required
-                    />
-                </motion.div>
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                        >
+                            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Work Email</label>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
+                                placeholder="name@company.com"
+                                required
+                            />
+                        </motion.div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.4 }}
+                            >
+                                <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Password</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
+                                    placeholder="At least 6 characters"
+                                    required
+                                />
+                            </motion.div>
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.5 }}
+                            >
+                                <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Confirm Password</label>
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
+                                    placeholder="Confirm password"
+                                    required
+                                />
+                            </motion.div>
+                        </div>
+                    </>
+                ) : (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
+                        transition={{ delay: 0.1 }}
                     >
-                        <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Password</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">OTP Code</label>
                         <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
-                            placeholder="At least 6 characters"
+                            type="text"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm tracking-widest text-center text-lg"
+                            placeholder="123456"
+                            maxLength={6}
                             required
                         />
+                        <p className="mt-2 text-xs text-slate-500 text-center">
+                            Did not receive code? <span className="text-indigo-400 cursor-pointer hover:underline" onClick={() => setStep(1)}>Resend (Go back)</span>
+                        </p>
                     </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.5 }}
-                    >
-                        <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Confirm Password</label>
-                        <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-[#0F1117] border border-slate-800 rounded-md text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all duration-200 sm:text-sm"
-                            placeholder="Confirm password"
-                            required
-                        />
-                    </motion.div>
-                </div>
+                )}
 
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -169,7 +216,7 @@ const Register = () => {
                             <Loader className="h-4 w-4 animate-spin" />
                         ) : (
                             <>
-                                Create Account <ArrowRight className="h-4 w-4" />
+                                {step === 1 ? 'Next' : 'Verify & Create Account'} <ArrowRight className="h-4 w-4" />
                             </>
                         )}
                     </button>

@@ -8,6 +8,14 @@ export const register = async (name, email, password) => {
     return response.data;
 };
 
+export const verifyEmail = async (email, otp) => {
+    const response = await axiosClient.post('/auth/verify-email', { email, otp });
+    if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+};
+
 export const login = async (email, password) => {
     const response = await axiosClient.post('/auth/login', { email, password });
     if (response.data.user) {

@@ -254,14 +254,7 @@ const Home = () => {
                                             {user?.name?.charAt(0)?.toUpperCase()}
                                         </div>
                                     )}
-                                    {/* <div className="flex flex-col items-start leading-none gap-1">
-                                        <span className="text-sm font-medium text-gray-500 group-hover:text-200 transition-colors">
-                                            {user?.name?.split(' ')[0]}
-                                        </span>
-                                        <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
-                                            {user?.role === 'student' ? 'Member' : user?.role}
-                                        </span>
-                                    </div> */}
+                                    
                                 </button>
                             </div>
                         </motion.div>
@@ -373,29 +366,29 @@ const Home = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm overflow-y-auto"
+                        className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm overflow-y-auto"
                     >
                         <div className="min-h-screen p-4">
                             <div className="max-w-6xl mx-auto">
                                 <div className="flex items-center justify-between mb-8 pt-4">
                                     <button
                                         onClick={() => setShowAttendance(false)}
-                                        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+                                        className="flex items-center gap-2 text-white hover:text-white transition-colors"
                                     >
                                         <ChevronRight size={20} className="rotate-180" />
                                         Back to Dashboard
                                     </button>
                                     <button
                                         onClick={() => setShowAttendance(false)}
-                                        className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                                        className="p-2 rounded-xl bg-white/5 hover:bg-red-500/80 transition-colors"
                                     >
                                         {/* Changed LogOut to X for clearer UI */}
-                                        <X size={20} className="text-gray-400" />
+                                        <X size={20} className="text-white" />
                                     </button>
                                 </div>
 
                                 {/* Attendance Calendar Component */}
-                                <div className="bg-[#0F0F12] border border-white/10 rounded-3xl overflow-hidden">
+                                <div className="bg-[#0F0F12/50] border border-white/10 rounded-3xl overflow-hidden">
                                     <AttendanceCalendar />
                                 </div>
                             </div>
