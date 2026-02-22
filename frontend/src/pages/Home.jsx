@@ -18,6 +18,7 @@ import QuickActionsGrid from '../components/dashboard/QuickActionsGrid';
 import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import AttendanceCalendar from '../components/AttendanceCalendar';
+import NoticeBoard from '../components/NoticeBoard';
 
 // --- Animations ---
 const containerVariants = {
@@ -254,7 +255,7 @@ const Home = () => {
                                             {user?.name?.charAt(0)?.toUpperCase()}
                                         </div>
                                     )}
-                                    
+
                                 </button>
                             </div>
                         </motion.div>
@@ -299,26 +300,32 @@ const Home = () => {
 
                     {/* --- FLOOR PLAN SECTION --- */}
                     {libraryId && (
-                        <motion.div variants={itemVariants} className="mb-10">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Live Floor Plan</h3>
-                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-400 dark:bg-gray-600"></span> Occupied</span>
-                                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-white border border-gray-300 dark:border-gray-600"></span> Available</span>
-                                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-600"></span> Yours</span>
-                                </div>
-                            </div>
+                        <motion.div variants={itemVariants} className="mb-10 w-full space-y-6">
 
-                            <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-1 overflow-hidden shadow-xl dark:shadow-2xl dark:shadow-black/50">
-                                {loadingSeats ? (
-                                    <div className="h-64 flex items-center justify-center text-gray-400 animate-pulse">
-                                        Loading Layout...
+                            {/* NOTICE BOARD WIDGET */}
+                            <NoticeBoard libraryId={libraryId} />
+
+                            <div>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Live Floor Plan</h3>
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-400 dark:bg-gray-600"></span> Occupied</span>
+                                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-white border border-gray-300 dark:border-gray-600"></span> Available</span>
+                                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-600"></span> Yours</span>
                                     </div>
-                                ) : (
-                                    <div className="bg-gray-100 dark:bg-[#1a1a20] rounded-[20px] overflow-hidden">
-                                        <UserSeatMap seats={seats} activeSeatId={activeSeat?.seatId} />
-                                    </div>
-                                )}
+                                </div>
+
+                                <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-1 overflow-hidden shadow-xl dark:shadow-2xl dark:shadow-black/50">
+                                    {loadingSeats ? (
+                                        <div className="h-64 flex items-center justify-center text-gray-400 animate-pulse">
+                                            Loading Layout...
+                                        </div>
+                                    ) : (
+                                        <div className="bg-gray-100 dark:bg-[#1a1a20] rounded-[20px] overflow-hidden">
+                                            <UserSeatMap seats={seats} activeSeatId={activeSeat?.seatId} />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     )}

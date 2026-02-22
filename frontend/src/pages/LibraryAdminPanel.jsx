@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import PlanManagement from '../components/PlanManagement';
 import UserSubscriptionManagement from '../components/UserSubscriptionManagement';
+import NoticeManagement from '../components/NoticeManagement';
 import { toast } from 'react-toastify';
-import { Settings, Users, DollarSign, ArrowLeft } from 'lucide-react';
+import { Settings, Users, DollarSign, ArrowLeft, BellRing } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -13,7 +14,7 @@ const LibraryAdminPanel = () => {
     const { id: libraryId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    
+
     const [activeTab, setActiveTab] = useState('subscriptions');
     const [loading, setLoading] = useState(true);
 
@@ -44,6 +45,7 @@ const LibraryAdminPanel = () => {
     const tabs = [
         { id: 'subscriptions', label: 'User Subscriptions', icon: Users },
         { id: 'plans', label: 'Plans Management', icon: DollarSign },
+        { id: 'notices', label: 'Announcements', icon: BellRing },
     ];
 
     return (
@@ -68,7 +70,7 @@ const LibraryAdminPanel = () => {
                 </motion.div>
 
                 {/* Modern Tabs */}
-                <div className="bg-white dark:bg-[#0F0F12] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 mb-8 overflow-hidden p-1.5 flex gap-1 w-fit">
+                <div className="bg-white dark:bg-[#0F0F12] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 mb-8 overflow-x-auto p-1.5 flex gap-1 w-full sm:w-fit custom-scrollbar">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
@@ -76,9 +78,8 @@ const LibraryAdminPanel = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors z-10 ${
-                                    isActive ? 'text-blue-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                                }`}
+                                className={`relative flex items-center shrink-0 gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors z-10 ${isActive ? 'text-blue-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                    }`}
                             >
                                 {isActive && (
                                     <motion.div
@@ -106,6 +107,7 @@ const LibraryAdminPanel = () => {
                         >
                             {activeTab === 'subscriptions' && <UserSubscriptionManagement libraryId={libraryId} />}
                             {activeTab === 'plans' && <PlanManagement libraryId={libraryId} />}
+                            {activeTab === 'notices' && <NoticeManagement libraryId={libraryId} />}
                         </motion.div>
                     </AnimatePresence>
                 </div>
