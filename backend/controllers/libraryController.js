@@ -403,18 +403,23 @@ const getNearbyLibraries = async (req, res) => {
             });
         }
 
-        const libraries = await Library.find({
-            location: {
-                $near: {
-                    $geometry: {
+        const libraries = await Library.aggregate([
+            {
+                $geoNear: {
+                    near: {
                         type: 'Point',
                         coordinates: [parseFloat(longitude), parseFloat(latitude)]
                     },
-                    $maxDistance: parseInt(maxDistance)
+                    distanceField: "dist.calculated", // Added exact distance
+                    maxDistance: parseInt(maxDistance),
+                    spherical: true,
+                    query: { isActive: true }
                 }
-            },
-            isActive: true
-        }).populate('ownerId', 'name email phone');
+            }
+        ]);
+
+        // Populate ownerId since aggregate doesn't do it automatically like find()
+        await User.populate(libraries, { path: 'ownerId', select: 'name email phone' });
 
         res.status(200).json({
             message: "Nearby libraries retrieved successfully",

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import PrintQrComponent from '../components/qrCodeData';
 import SeatManagement from '../components/SeatManagement';
 import PlanManagement from '../components/PlanManagement';
+import MapLocationPicker from '../components/MapLocationPicker';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const AMENITIES_OPTIONS = [
@@ -95,6 +96,14 @@ const EditLibrary = () => {
         }));
     };
 
+    const handleLocationSelect = (position) => {
+        setFormData(prev => ({
+            ...prev,
+            latitude: position[0].toString(),
+            longitude: position[1].toString()
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -142,7 +151,7 @@ const EditLibrary = () => {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-<LoadingSpinner/>
+                <LoadingSpinner />
             </div>
         );
     }
@@ -210,17 +219,26 @@ const EditLibrary = () => {
                     </div>
 
                     {/* Location */}
-                    <div className="backdrop-blur-xl bg-white/10 rounded-2xl border border-white/20 p-6">
-                        <h2 className="text-xl font-semibold text-white mb-4">Location</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="backdrop-blur-xl bg-white/10 rounded-2xl border border-white/20 p-6 space-y-6">
+                        <h2 className="text-xl font-semibold text-white mb-2">Location</h2>
+
+                        {/* Interactive Map */}
+                        {!loading && formData.latitude && formData.longitude && (
+                            <MapLocationPicker
+                                defaultLocation={[parseFloat(formData.latitude), parseFloat(formData.longitude)]}
+                                onLocationSelect={handleLocationSelect}
+                            />
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/10">
                             <div>
                                 <label className="block text-sm font-medium text-gray-200 mb-2">Longitude</label>
-                                <input type="text" name="longitude" value={formData.longitude} onChange={handleChange}
+                                <input type="text" name="longitude" value={formData.longitude} onChange={handleChange} readOnly
                                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-200 mb-2">Latitude</label>
-                                <input type="text" name="latitude" value={formData.latitude} onChange={handleChange}
+                                <input type="text" name="latitude" value={formData.latitude} onChange={handleChange} readOnly
                                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
                             </div>
                             <div className="md:col-span-2">

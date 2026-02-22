@@ -7,8 +7,9 @@ import Navbar from '../components/Navbar';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, MapPin, Armchair, ChevronRight,
-    Trash2, Edit, Power, Star
+    Trash2, Edit, Power, Star, Map, LayoutGrid
 } from 'lucide-react';
+import NearbyLibrariesMap from '../components/NearbyLibrariesMap';
 
 const AllLibraries = () => {
     const navigate = useNavigate();
@@ -18,6 +19,7 @@ const AllLibraries = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [pagination, setPagination] = useState({});
+    const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
 
     const isAdmin = user?.role === 'admin' || user?.role === 'co-admin';
 
@@ -136,14 +138,34 @@ const AllLibraries = () => {
                             />
                         </div>
 
-                        {isAdmin && (
-                            <button
-                                onClick={() => navigate('/add-library')}
-                                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all active:scale-95 flex items-center justify-center gap-2"
-                            >
-                                <span>Add Library</span>
-                            </button>
-                        )}
+                        {/* Map Toggle & Actions */}
+                        <div className="flex gap-2 w-full md:w-auto overflow-hidden">
+                            <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl">
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'}`}
+                                >
+                                    <LayoutGrid size={18} />
+                                    <span className="hidden sm:inline">List</span>
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('map')}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${viewMode === 'map' ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 shadow-sm' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'}`}
+                                >
+                                    <Map size={18} />
+                                    <span className="hidden sm:inline">Map</span>
+                                </button>
+                            </div>
+
+                            {isAdmin && (
+                                <button
+                                    onClick={() => navigate('/add-library')}
+                                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
+                                >
+                                    <span>Add Library</span>
+                                </button>
+                            )}
+                        </div>
                     </motion.div>
                 </div>
 
@@ -153,8 +175,10 @@ const AllLibraries = () => {
                     </div>
                 )}
 
-                {/* Content Grid */}
-                {loading ? (
+                {/* Main Content Area */}
+                {viewMode === 'map' ? (
+                    <NearbyLibrariesMap />
+                ) : loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {[1, 2, 3, 4, 5, 6].map((n) => (
                             <div key={n} className="bg-white dark:bg-white/5 rounded-3xl h-80 animate-pulse border border-gray-200 dark:border-white/5" />
@@ -290,8 +314,8 @@ const AllLibraries = () => {
                     </motion.div>
                 )}
 
-                {/* Pagination */}
-                {pagination.totalPages > 1 && (
+                {/* Pagination Details (Only list view) */}
+                {viewMode === 'list' && pagination.totalPages > 1 && (
                     <div className="mt-6 flex justify-center pb-10">
                         <div className="flex items-center gap-2 bg-white dark:bg-white/5 p-2 rounded-2xl shadow-sm border border-gray-200 dark:border-white/10">
                             <button

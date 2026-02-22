@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addLibrary } from '../api/library';
 import { useAuth } from '../context/AuthContext';
+import MapLocationPicker from '../components/MapLocationPicker';
 
 const AMENITIES_OPTIONS = [
     'High-Speed WiFi', 'AC', 'Non-AC', 'Personal Cabin',
@@ -61,6 +62,14 @@ const AddLibrary = () => {
             amenities: prev.amenities.includes(amenity)
                 ? prev.amenities.filter(a => a !== amenity)
                 : [...prev.amenities, amenity]
+        }));
+    };
+
+    const handleLocationSelect = (position) => {
+        setFormData(prev => ({
+            ...prev,
+            latitude: position[0].toString(),
+            longitude: position[1].toString()
         }));
     };
 
@@ -224,9 +233,13 @@ const AddLibrary = () => {
                     </div>
 
                     {/* Location */}
-                    <div className="bg-white dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm">
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Location</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white dark:bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm space-y-6">
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Location</h2>
+
+                        {/* Interactive Map */}
+                        <MapLocationPicker onLocationSelect={handleLocationSelect} />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-white/10">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Longitude *</label>
                                 <input
@@ -237,6 +250,7 @@ const AddLibrary = () => {
                                     className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
                                     placeholder="77.5946"
                                     required
+                                    readOnly
                                 />
                             </div>
                             <div>
@@ -249,6 +263,7 @@ const AddLibrary = () => {
                                     className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
                                     placeholder="12.9716"
                                     required
+                                    readOnly
                                 />
                             </div>
                             <div className="md:col-span-2">
