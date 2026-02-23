@@ -39,7 +39,19 @@ const NoticeBoard = ({ libraryId }) => {
     }
 
     if (notices.length === 0) {
-        return null; // Explicitly hiding if there's no active announcement
+        return (
+            <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-6 shadow-xl dark:shadow-2xl dark:shadow-black/50 text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-full blur-[80px] -z-10 -translate-y-1/2 translate-x-1/2"></div>
+
+                <div className="flex flex-col items-center justify-center py-8">
+                    <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-full mb-4">
+                        <Bell className="text-gray-400 dark:text-gray-500" size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">All Caught Up!</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">There are no active announcements right now.</p>
+                </div>
+            </div>
+        );
     }
 
     const getPriorityStyles = (priority) => {
@@ -69,7 +81,7 @@ const NoticeBoard = ({ libraryId }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-6 shadow-xl dark:shadow-2xl dark:shadow-black/50 mb-10 overflow-hidden relative">
+        <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-3xl p-6 shadow-xl dark:shadow-2xl dark:shadow-black/50 overflow-hidden relative">
 
             {/* Background Accent */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-full blur-[80px] -z-10 -translate-y-1/2 translate-x-1/2"></div>

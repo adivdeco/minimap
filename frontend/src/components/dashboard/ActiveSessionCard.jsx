@@ -94,7 +94,7 @@ const ActiveSessionCard = ({
                         <div>
                             <p className="text-xs text-gray-500 uppercase font-bold mb-1">Check-in Time</p>
                             <p className="text-xl text-white font-mono">
-                                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(activeSeat.startTime || new Date()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                             </p>
                         </div>
                     </div>

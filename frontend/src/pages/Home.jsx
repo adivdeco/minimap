@@ -6,10 +6,11 @@ import SmartLibraryScanner from '../components/SmartLibraryScanner';
 import CountdownTimer from '../components/CountdownTimer';
 import UserSeatMap from '../components/UserSeatMap';
 import { getLibrarySeats } from '../api/seat';
+import { getNotices } from '../api/notice';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import {
-    Library, CalendarDays, Sun, Moon, X, ChevronRight, Users
+    Library, CalendarDays, Sun, Moon, X, ChevronRight, Users, Bell
 } from 'lucide-react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import ActiveSessionCard from '../components/dashboard/ActiveSessionCard';
@@ -46,6 +47,8 @@ const Home = () => {
 
     const [showScanner, setShowScanner] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
+    const [showNotices, setShowNotices] = useState(false);
+    const [unreadNotices, setUnreadNotices] = useState(0);
     const [checkingOut, setCheckingOut] = useState(false);
 
     // Seat Canvas State
@@ -96,8 +99,19 @@ const Home = () => {
             }
         };
 
+        const fetchUnreadNotices = async () => {
+            if (!libraryId) return;
+            try {
+                const data = await getNotices(libraryId, true);
+                setUnreadNotices(data.notices?.length || 0);
+            } catch (error) {
+                console.error("Failed to fetch notices for bell", error);
+            }
+        };
+
         if (libraryId) {
             fetchSeats();
+            fetchUnreadNotices();
         }
         // Fix: Use primitive values in dependency array to avoid infinite loops
     }, [libraryId, activeSeat?.seatNumber]);
@@ -163,9 +177,9 @@ const Home = () => {
                             className="flex items-center gap-3 cursor-pointer"
                             onClick={() => navigate('/')}
                         >
-                            <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+                            {/* <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
                                 <Library className="text-white" size={20} />
-                            </div>
+                            </div> */}
                             <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
                                 Study<span className="text-purple-600 dark:text-purple-400">Space</span>
                             </span>
@@ -184,6 +198,20 @@ const Home = () => {
                             >
                                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                             </button>
+
+                            {/* Notifications Bell */}
+                            {libraryId && (
+                                <button
+                                    onClick={() => setShowNotices(true)}
+                                    className="p-2 ml-1 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all relative"
+                                    title="Notices"
+                                >
+                                    <Bell size={18} />
+                                    {unreadNotices > 0 && (
+                                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                    )}
+                                </button>
+                            )}
                         </div>
 
                         {/* Profile & Logout (Right Corner) */}
@@ -234,6 +262,18 @@ const Home = () => {
                                 >
                                     {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                                 </button>
+
+                                {libraryId && (
+                                    <button
+                                        onClick={() => setShowNotices(true)}
+                                        className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all relative"
+                                    >
+                                        <Bell size={18} />
+                                        {unreadNotices > 0 && (
+                                            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                        )}
+                                    </button>
+                                )}
 
                                 {hasSubscription && (
                                     <button
@@ -301,9 +341,6 @@ const Home = () => {
                     {/* --- FLOOR PLAN SECTION --- */}
                     {libraryId && (
                         <motion.div variants={itemVariants} className="mb-10 w-full space-y-6">
-
-                            {/* NOTICE BOARD WIDGET */}
-                            <NoticeBoard libraryId={libraryId} />
 
                             <div>
                                 <div className="flex items-center justify-between mb-6">
@@ -400,6 +437,34 @@ const Home = () => {
                                 </div>
                             </div>
                         </div>
+                    </motion.div>
+                )}
+
+                {/* Notifications Modal */}
+                {showNotices && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm overflow-y-auto flex items-center justify-center p-4 sm:p-6"
+                        onClick={() => setShowNotices(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="w-full max-w-lg relative"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <button
+                                onClick={() => setShowNotices(false)}
+                                className="absolute -top-12 right-0 p-2 rounded-xl bg-white/10 hover:bg-red-500/80 transition-colors text-white border border-white/20"
+                            >
+                                <X size={20} />
+                            </button>
+
+                            <NoticeBoard libraryId={libraryId} />
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
