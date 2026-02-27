@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { activateSubscriptionOffline } from '../api/entry';
+import { activateSubscriptionOffline, grantGracePeriod } from '../api/entry';
 import { getLibraryPlans } from '../api/plan';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
-import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X } from 'lucide-react';
+import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const UserSubscriptionManagement = ({ libraryId }) => {
@@ -14,7 +14,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    
+
     // Modal & Form State
     const [showModal, setShowModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
@@ -25,6 +25,11 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         startDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'cash'
     });
+
+    // Grace Period Modal State
+    const [showGraceModal, setShowGraceModal] = useState(false);
+    const [graceDays, setGraceDays] = useState(3);
+    const [grantingGraceId, setGrantingGraceId] = useState(null);
 
     const canManageSubscriptions = currentUser?.role === 'admin' || currentUser?.role === 'library_owner';
 
@@ -135,6 +140,38 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         }
     };
 
+    const openGraceModal = (user) => {
+        if (!user.studentDetails?.currentSubscription?.subscriptionId) {
+            return toast.error("User does not have a previous subscription to extend.");
+        }
+        setSelectedUser(user);
+        setGraceDays(3);
+        setShowGraceModal(true);
+    };
+
+    const handleGrantGracePeriod = async (e) => {
+        e.preventDefault();
+        if (!graceDays || graceDays <= 0) return toast.error("Please enter a valid number of days");
+
+        try {
+            setGrantingGraceId(selectedUser._id);
+            const subId = selectedUser.studentDetails.currentSubscription.subscriptionId;
+            const response = await grantGracePeriod(libraryId, subId, graceDays);
+
+            if (response.success) {
+                toast.success(`Granted ${graceDays} grace days to ${selectedUser.name}`);
+                setShowGraceModal(false);
+                fetchLibraryUsers();
+            } else {
+                toast.error(response.msg || "Failed to grant grace period");
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.msg || "Failed to grant grace period");
+        } finally {
+            setGrantingGraceId(null);
+        }
+    };
+
     const filteredUsers = users.filter(user =>
         user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -201,6 +238,20 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                     const subscription = user.studentDetails?.currentSubscription;
                                     const isActive = subscription?.status === 'active' && new Date(subscription.expiryDate) > new Date();
 
+                                    let isInGracePeriod = false;
+                                    let graceEndDate = null;
+                                    let isGracePeriodExpired = false;
+
+                                    if (!isActive && subscription?.gracePeriodAllowed) {
+                                        const graceStart = new Date(subscription.graceStartDate || new Date());
+                                        graceEndDate = new Date(graceStart.getTime() + (subscription.graceDaysAllowed || 0) * 24 * 60 * 60 * 1000);
+                                        if (new Date() <= graceEndDate) {
+                                            isInGracePeriod = true;
+                                        } else {
+                                            isGracePeriodExpired = true;
+                                        }
+                                    }
+
                                     return (
                                         <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
@@ -219,6 +270,26 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                                             <Clock size={12} /> Active
                                                         </span>
                                                         <span className="text-[11px] text-gray-500">Exp: {new Date(subscription.expiryDate).toLocaleDateString()}</span>
+                                                        {subscription?.graceDaysUsed > 0 && (
+                                                            <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                                                                <Gift size={10} /> Used {subscription.graceDaysUsed} Grace Days
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : isInGracePeriod ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="px-2.5 py-1 bg-purple-100 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1.5 w-fit border border-purple-200 dark:border-purple-500/20">
+                                                            <Gift size={12} /> Grace Period
+                                                        </span>
+                                                        <span className="text-[11px] text-gray-500">Ends: {graceEndDate.toLocaleDateString()}</span>
+                                                        <span className="text-[10px] text-purple-500 font-medium">{subscription.graceDaysAllowed} Days Left</span>
+                                                    </div>
+                                                ) : isGracePeriodExpired ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="px-2.5 py-1 bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1.5 w-fit border border-red-200 dark:border-red-500/20">
+                                                            Grace Expired
+                                                        </span>
+                                                        <span className="text-[11px] text-gray-500">Ended: {graceEndDate.toLocaleDateString()}</span>
                                                     </div>
                                                 ) : (
                                                     <span className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider rounded-md border border-gray-200 dark:border-gray-700">
@@ -228,13 +299,25 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right">
                                                 {!isActive ? (
-                                                    <button
-                                                        onClick={() => openActivationModal(user)}
-                                                        disabled={activatingId === user._id}
-                                                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
-                                                    >
-                                                        <Plus size={14} /> {activatingId === user._id ? 'Processing...' : 'Assign Plan'}
-                                                    </button>
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {subscription?.subscriptionId && !subscription?.gracePeriodAllowed && (
+                                                            <button
+                                                                onClick={() => openGraceModal(user)}
+                                                                disabled={grantingGraceId === user._id || activatingId === user._id}
+                                                                title="Grant Grace Period"
+                                                                className="inline-flex items-center justify-center p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-200 dark:hover:bg-purple-800/50 disabled:opacity-50 transition-colors shadow-sm"
+                                                            >
+                                                                <Gift size={16} />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => openActivationModal(user)}
+                                                            disabled={activatingId === user._id || grantingGraceId === user._id}
+                                                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                                                        >
+                                                            <Plus size={14} /> {activatingId === user._id ? 'Processing...' : 'Assign Plan'}
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     <span className="text-sm font-medium text-gray-400 dark:text-gray-500 mr-4">Up to date</span>
                                                 )}
@@ -252,9 +335,9 @@ const UserSubscriptionManagement = ({ libraryId }) => {
             <AnimatePresence>
                 {showModal && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                        <motion.div 
-                            initial={{ scale: 0.95, opacity: 0 }} 
-                            animate={{ scale: 1, opacity: 1 }} 
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
                             className="bg-white dark:bg-[#18181b] rounded-3xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-white/10 overflow-hidden"
                         >
@@ -347,6 +430,69 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                         className="flex-[2] py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors font-bold text-sm shadow-md"
                                     >
                                         {activatingId === selectedUser?._id ? 'Processing...' : 'Confirm Activation'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Grace Period Modal */}
+                {showGraceModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white dark:bg-[#18181b] rounded-3xl shadow-2xl max-w-sm w-full border border-gray-200 dark:border-white/10 overflow-hidden"
+                        >
+                            <div className="bg-purple-50 dark:bg-purple-500/10 p-6 border-b border-purple-100 dark:border-purple-500/20 relative">
+                                <button onClick={() => setShowGraceModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
+                                    <X size={20} />
+                                </button>
+                                <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-1">
+                                    <Gift size={20} />
+                                    <h3 className="text-xl font-bold">Grace Period</h3>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    Extend access temporarily for <strong className="text-gray-900 dark:text-white">{selectedUser?.name}</strong>
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleGrantGracePeriod} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Number of Days *</label>
+                                    <div className="relative">
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                        <input
+                                            type="number"
+                                            value={graceDays}
+                                            onChange={(e) => setGraceDays(e.target.value)}
+                                            min="1"
+                                            max="30"
+                                            className="w-full pl-9 pr-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm text-gray-900 dark:text-white"
+                                            required
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        These days will be deducted from their next subscription plan automatically upon payment.
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGraceModal(false)}
+                                        className="flex-1 py-3 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-white/10 transition-colors font-medium text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={grantingGraceId === selectedUser?._id}
+                                        className="flex-[2] py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-colors font-bold text-sm shadow-md"
+                                    >
+                                        {grantingGraceId === selectedUser?._id ? 'Granting...' : 'Confirm'}
                                     </button>
                                 </div>
                             </form>

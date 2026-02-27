@@ -39,3 +39,11 @@ export const activateSubscriptionOffline = async (userId, libraryId, planId, pri
     return response.data;
 };
 
+// Grant Grace Period (Admin/Owner only)
+export const grantGracePeriod = async (libraryId, subscriptionId, graceDays) => {
+    const response = await api.post(`/entry/grant-grace-period/${libraryId}/${subscriptionId}`, {
+        graceDays
+    });
+    return response.data;
+};
+
