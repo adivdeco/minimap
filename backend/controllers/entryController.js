@@ -174,12 +174,31 @@ exports.checkIn = async (req, res) => {
         }
 
         // 4. Check Subscription
-        const activeSub = await Subscription.findOne({
+        let activeSub = await Subscription.findOne({
             userId,
             libraryId: library._id,
             status: 'active',
             expiryDate: { $gt: new Date() }
         }).session(session);
+
+        // --- CHECK GRACE PERIOD ---
+        if (!activeSub) {
+            const graceSub = await Subscription.findOne({
+                userId,
+                libraryId: library._id,
+                gracePeriodAllowed: true
+            }).sort({ createdAt: -1 }).session(session);
+
+            if (graceSub) {
+                const now = new Date();
+                const graceStart = graceSub.graceStartDate || now; // fallback
+                const graceEnd = new Date(graceStart.getTime() + graceSub.graceDaysAllowed * 24 * 60 * 60 * 1000);
+
+                if (now <= graceEnd) {
+                    activeSub = graceSub; // Treat grace period sub as active for check-in
+                }
+            }
+        }
 
         // --- SCENARIO A: VALID SUBSCRIPTION ---
         if (activeSub) {
@@ -431,9 +450,37 @@ exports.activateSubscriptionOffline = async (req, res) => {
 
         if (existingActiveSub) throw new Error("BAD_REQUEST: User already has an active subscription");
 
+        // --- GRACE PERIOD DEDUCTION ---
+        const graceSub = await Subscription.findOne({
+            userId,
+            libraryId,
+            gracePeriodAllowed: true
+        }).sort({ createdAt: -1 }).session(session);
+
+        let graceDaysToDeduct = 0;
+        if (graceSub && !graceSub.graceDaysUsed) {
+            const now = new Date();
+            const graceStart = graceSub.graceStartDate || now;
+            const msUsed = now.getTime() - graceStart.getTime();
+            let daysUsed = Math.ceil(msUsed / (1000 * 60 * 60 * 24));
+
+            if (daysUsed > graceSub.graceDaysAllowed) daysUsed = graceSub.graceDaysAllowed;
+            if (daysUsed < 0) daysUsed = 0;
+
+            graceDaysToDeduct = daysUsed;
+
+            // Mark grace period as accounted for
+            graceSub.graceDaysUsed = daysUsed;
+            graceSub.gracePeriodAllowed = false;
+            await graceSub.save({ session });
+        }
+
         const subStartDate = startDate ? new Date(startDate) : new Date();
         const expiryDate = new Date(subStartDate);
-        expiryDate.setDate(expiryDate.getDate() + plan.durationInDays);
+
+        let finalDuration = plan.durationInDays - graceDaysToDeduct;
+        if (finalDuration < 1) finalDuration = 1; // Allow minimum 1 day if grace period ate up the whole plan
+        expiryDate.setDate(expiryDate.getDate() + finalDuration);
 
         const [newSub] = await Subscription.create([{
             userId,
@@ -588,7 +635,10 @@ exports.getAttendanceHistory = async (req, res) => {
     try {
         const userId = req.finduser._id;
 
-        // 1. Try Optimized Fetch
+        // 1. Fetch total count of user's attendance records to detect missing migration
+        const totalAttendanceCount = await Attendance.countDocuments({ userId });
+
+        // 2. Try Optimized Fetch
         const user = await User.findById(userId)
             .populate({
                 path: 'attendanceHistory',
@@ -601,23 +651,22 @@ exports.getAttendanceHistory = async (req, res) => {
             return res.status(404).json({ success: false, msg: "User not found" });
         }
 
-        // 2. Check if Optimized Data Exists
-        if (user.attendanceHistory && user.attendanceHistory.length > 0) {
+        // 3. Check if Optimized Data Contains EVERYTHING
+        if (user.attendanceHistory && user.attendanceHistory.length === totalAttendanceCount && totalAttendanceCount > 0) {
             return res.json({ success: true, history: user.attendanceHistory });
         }
 
-        // 3. Fallback: Legacy Fetch (If optimized field is empty but user might have old data)
+        // 4. Fallback: Missing data detected. Fetch full history directly from collection.
         const history = await Attendance.find(
             { userId },
             { date: 1, totalDurationToday: 1, sessionCount: 1, sessions: 1 }
         ).sort({ date: -1 });
 
-        // 4. Self-Healing: Update User Record (Lazy Migration)
+        // 5. Self-Healing: Sync ALL records to User Record (overwrite to ensure completeness & order)
         if (history.length > 0) {
             const attendanceIds = history.map(h => h._id);
-            // We use $addToSet to avoid duplicates if some IDs were already there
             await User.findByIdAndUpdate(userId, {
-                $addToSet: { attendanceHistory: { $each: attendanceIds } }
+                $set: { attendanceHistory: attendanceIds }
             });
         }
 
@@ -626,5 +675,95 @@ exports.getAttendanceHistory = async (req, res) => {
     } catch (err) {
         console.error("Get History Error:", err);
         res.status(500).json({ success: false, msg: "Failed to fetch history" });
+    }
+};
+
+// ==========================================
+// 7. CONTROLLER: GRANT GRACE PERIOD
+// ==========================================
+exports.grantGracePeriod = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { libraryId, subscriptionId } = req.params;
+        const { graceDays } = req.body;
+        const adminId = req.finduser._id;
+        const adminRole = req.finduser.role;
+
+        if (!graceDays || graceDays <= 0) {
+            throw new Error("BAD_REQUEST: Invalid grace days");
+        }
+
+        const library = await Library.findById(libraryId).session(session);
+        if (!library) throw new Error("NOT_FOUND: Library not found");
+
+        const isAdmin = adminRole === 'admin' || adminRole === 'co-admin';
+        const isLibraryOwner = adminRole === 'library_owner' && library.ownerId.toString() === adminId.toString();
+
+        if (!isAdmin && !isLibraryOwner) throw new Error("FORBIDDEN: Unauthorized to grant grace period");
+
+        const subscription = await Subscription.findById(subscriptionId).session(session);
+        if (!subscription) throw new Error("NOT_FOUND: Subscription not found");
+
+        if (subscription.libraryId.toString() !== libraryId.toString()) {
+            throw new Error("BAD_REQUEST: Subscription does not belong to this library");
+        }
+
+        if (subscription.expiryDate > new Date()) {
+            throw new Error("BAD_REQUEST: Cannot grant grace period to an active subscription");
+        }
+
+        subscription.gracePeriodAllowed = true;
+        subscription.graceDaysAllowed = Number(graceDays);
+        if (!subscription.graceStartDate) {
+            subscription.graceStartDate = new Date();
+        }
+        // Only reset used days if this is a fresh grace period grant
+        if (!subscription.graceDaysUsed) {
+            subscription.graceDaysUsed = 0;
+        }
+        subscription.status = 'expired';
+
+        await subscription.save({ session });
+
+        await User.findByIdAndUpdate(
+            subscription.userId,
+            {
+                $set: {
+                    'studentDetails.currentSubscription': {
+                        subscriptionId: subscription._id,
+                        libraryId: library._id,
+                        planId: subscription.planId,
+                        startDate: subscription.startDate,
+                        expiryDate: subscription.expiryDate,
+                        status: 'expired'
+                    }
+                }
+            },
+            { session }
+        );
+
+        await session.commitTransaction();
+
+        res.status(200).json({
+            success: true,
+            msg: `Successfully granted ${graceDays} days of grace period.`,
+            subscription
+        });
+
+    } catch (err) {
+        await session.abortTransaction();
+        console.error("Grant Grace Period Error:", err);
+        const code = err.message.split(':')[0];
+        const msg = err.message.split(': ')[1] || "Failed";
+
+        if (code === "BAD_REQUEST") return res.status(400).json({ success: false, msg });
+        if (code === "NOT_FOUND") return res.status(404).json({ success: false, msg });
+        if (code === "FORBIDDEN") return res.status(403).json({ success: false, msg });
+
+        res.status(500).json({ success: false, msg: "Failed to grant grace period" });
+    } finally {
+        session.endSession();
     }
 };

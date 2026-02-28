@@ -145,7 +145,8 @@ const UserSubscriptionManagement = ({ libraryId }) => {
             return toast.error("User does not have a previous subscription to extend.");
         }
         setSelectedUser(user);
-        setGraceDays(3);
+        const currentSub = user.studentDetails?.currentSubscription;
+        setGraceDays(currentSub?.gracePeriodAllowed ? currentSub.graceDaysAllowed : 3);
         setShowGraceModal(true);
     };
 
@@ -282,7 +283,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                                             <Gift size={12} /> Grace Period
                                                         </span>
                                                         <span className="text-[11px] text-gray-500">Ends: {graceEndDate.toLocaleDateString()}</span>
-                                                        <span className="text-[10px] text-purple-500 font-medium">{subscription.graceDaysAllowed} Days Left</span>
+                                                        <span className="text-[10px] text-purple-500 font-medium">{subscription.graceDaysAllowed} Extended Days</span>
                                                     </div>
                                                 ) : isGracePeriodExpired ? (
                                                     <div className="flex flex-col gap-1">
@@ -300,11 +301,11 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                             <td className="px-6 py-4 whitespace-nowrap text-right">
                                                 {!isActive ? (
                                                     <div className="flex items-center justify-end gap-2">
-                                                        {subscription?.subscriptionId && !subscription?.gracePeriodAllowed && (
+                                                        {subscription?.subscriptionId && (
                                                             <button
                                                                 onClick={() => openGraceModal(user)}
                                                                 disabled={grantingGraceId === user._id || activatingId === user._id}
-                                                                title="Grant Grace Period"
+                                                                title={subscription?.gracePeriodAllowed ? "Update Grace Period" : "Grant Grace Period"}
                                                                 className="inline-flex items-center justify-center p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-200 dark:hover:bg-purple-800/50 disabled:opacity-50 transition-colors shadow-sm"
                                                             >
                                                                 <Gift size={16} />
@@ -461,7 +462,9 @@ const UserSubscriptionManagement = ({ libraryId }) => {
 
                             <form onSubmit={handleGrantGracePeriod} className="p-6 space-y-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Number of Days *</label>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                        {selectedUser?.studentDetails?.currentSubscription?.gracePeriodAllowed ? 'Total Number of Days *' : 'Number of Days *'}
+                                    </label>
                                     <div className="relative">
                                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                         <input
@@ -475,7 +478,9 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                         />
                                     </div>
                                     <p className="text-xs text-gray-500 mt-2">
-                                        These days will be deducted from their next subscription plan automatically upon payment.
+                                        {selectedUser?.studentDetails?.currentSubscription?.gracePeriodAllowed
+                                            ? `Currently set to ${selectedUser.studentDetails.currentSubscription.graceDaysAllowed} total days from initial grant.`
+                                            : 'These days will be deducted from their next subscription plan automatically upon payment.'}
                                     </p>
                                 </div>
 

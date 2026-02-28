@@ -14,7 +14,13 @@ const subscriptionSchema = new Schema({
         enum: ['active', 'expired', 'cancelled'],
         default: 'active'
     },
-    paymentId: String // For future payment integration
+    paymentId: String, // For future payment integration
+
+    // --- Grace Period / Temporary Credit ---
+    gracePeriodAllowed: { type: Boolean, default: false },
+    graceDaysAllowed: { type: Number, default: 0 },
+    graceDaysUsed: { type: Number, default: 0 },
+    graceStartDate: { type: Date }
 }, { timestamps: true });
 
 // Check active subscriptions easily

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import {
   Users, CheckCircle, DollarSign, Activity, Clock, Calendar, Search,
   Filter, ChevronLeft, ChevronRight, X, Download, MoreVertical,
-  ArrowUpRight, MapPin, Plus, TrendingUp, AlertTriangle, FileText
+  ArrowUpRight, MapPin, Plus, TrendingUp, AlertTriangle, FileText, Gift
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient'; // Assuming you use this for auth interceptors
 import { motion, AnimatePresence } from 'framer-motion';
@@ -270,11 +270,33 @@ const UserCard = ({ user, onClick }) => {
   const engagementScore = calculateEngagementScore(user);
   const engagementLevel = getEngagementLevel(engagementScore);
 
+  const subscription = user.subscription;
+  const isActive = subscription?.status === 'active' && new Date(subscription.expiryDate) > new Date();
+
+  let isInGracePeriod = false;
+  let graceEndDate = null;
+  let isGracePeriodExpired = false;
+
+  if (!isActive && subscription?.gracePeriodAllowed) {
+    const graceStart = new Date(subscription?.graceStartDate || new Date());
+    graceEndDate = new Date(graceStart.getTime() + (subscription.graceDaysAllowed || 0) * 24 * 60 * 60 * 1000);
+    if (new Date() <= graceEndDate) {
+      isInGracePeriod = true;
+    } else {
+      isGracePeriodExpired = true;
+    }
+  }
+
   // Use utility for color
-  const statusColor = getStatusColor(user.subscription?.status);
+  const statusColor = isInGracePeriod ? '#9333ea' : isGracePeriodExpired ? '#dc2626' : getStatusColor(subscription?.status);
+
+  // Update status label dynamically based on grace
+  let displayStatus = subscription?.status || 'Unknown';
+  if (isInGracePeriod) displayStatus = 'Grace Period';
+  else if (isGracePeriodExpired) displayStatus = 'Grace Expired';
 
   // Compute subscription timeline
-  const subInfo = user.subscription ? getSubscriptionInfo(user.subscription) : null;
+  const subInfo = subscription ? getSubscriptionInfo(subscription) : null;
 
   return (
     <motion.div layout onClick={onClick} className="group relative bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-2xl p-5 cursor-pointer hover:border-purple-500/50 hover:shadow-lg transition-all active:scale-[0.98] flex flex-col justify-between h-full">
@@ -300,6 +322,11 @@ const UserCard = ({ user, onClick }) => {
                 {subInfo.daysRemaining} days left
               </span>
             )}
+            {isInGracePeriod && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 flex items-center gap-1">
+                <Gift size={10} /> {subscription.graceDaysAllowed} Grace Days
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -315,7 +342,7 @@ const UserCard = ({ user, onClick }) => {
             <TrendingUp size={12} /> {engagementLevel.label} User
           </span>
           <span className="px-2.5 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wider" style={{ color: statusColor, borderColor: `${statusColor}40`, backgroundColor: `${statusColor}10` }}>
-            {user.subscription?.status || 'Unknown'}
+            {displayStatus}
           </span>
         </div>
       </div>
@@ -327,6 +354,31 @@ const UserAnalyticsModal = ({ analytics, libraryName, onClose }) => {
   // Utilize helper functions
   const insights = generateUserInsights(analytics);
   const subInfo = getSubscriptionInfo(analytics.subscription);
+
+  const subscription = analytics.subscription;
+  const isActive = subscription?.status === 'active' && new Date(subscription.expiryDate) > new Date();
+
+  let isInGracePeriod = false;
+  let graceEndDate = null;
+  let isGracePeriodExpired = false;
+
+  if (!isActive && subscription?.gracePeriodAllowed) {
+    const graceStart = new Date(subscription.graceStartDate || new Date());
+    graceEndDate = new Date(graceStart.getTime() + (subscription.graceDaysAllowed || 0) * 24 * 60 * 60 * 1000);
+    if (new Date() <= graceEndDate) {
+      isInGracePeriod = true;
+    } else {
+      isGracePeriodExpired = true;
+    }
+  }
+
+  let displayStatusModal = subscription?.status || 'Unknown';
+  if (isInGracePeriod) displayStatusModal = 'Grace Period';
+  else if (isGracePeriodExpired) displayStatusModal = 'Grace Expired';
+
+  let statusBgClass = subscription?.status === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400';
+  if (isInGracePeriod) statusBgClass = 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400';
+  else if (isGracePeriodExpired) statusBgClass = 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400';
 
   // Group Sessions by Date for UI list
   const groupedSessions = (analytics.recentSessions || []).reduce((groups, session) => {
@@ -402,8 +454,8 @@ const UserAnalyticsModal = ({ analytics, libraryName, onClose }) => {
             <div className="flex justify-between items-center mb-3">
               <span className="font-bold text-lg">{analytics.subscription.planName}</span>
               <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide
-                  ${analytics.subscription.status === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'}`}>
-                {analytics.subscription.status}
+                  ${statusBgClass}`}>
+                {displayStatusModal}
               </span>
             </div>
 
@@ -412,6 +464,11 @@ const UserAnalyticsModal = ({ analytics, libraryName, onClose }) => {
               {subInfo.isActive && (
                 <span className={`font-medium px-2 py-0.5 rounded-md ${subInfo.isExpiringSoon ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'}`}>
                   {subInfo.daysRemaining} days left
+                </span>
+              )}
+              {isInGracePeriod && (
+                <span className="font-medium px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 flex items-center gap-1">
+                  <Gift size={14} /> {subscription.graceDaysAllowed} Grace Days
                 </span>
               )}
             </div>

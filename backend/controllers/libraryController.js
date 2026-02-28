@@ -948,7 +948,11 @@ const getLibraryUsers = async (req, res) => {
                         startDate: sub.startDate,
                         expiryDate: sub.expiryDate,
                         status: sub.status,
-                        pricePaid: sub.pricePaid
+                        pricePaid: sub.pricePaid,
+                        gracePeriodAllowed: sub.gracePeriodAllowed,
+                        graceDaysAllowed: sub.graceDaysAllowed,
+                        graceDaysUsed: sub.graceDaysUsed,
+                        graceStartDate: sub.graceStartDate
                     },
                     attendance: {
                         totalSessions: attendance.totalSessions || 0,
