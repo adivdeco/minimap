@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, User, Armchair, AlertCircle, Wrench, Smartphone, LayoutGrid, Map } from 'lucide-react';
-import { getLibrarySeats, updateSeatStatus } from '../api/seat';
+import { getLibrarySeats, updateSeatStatus, reserveSeat, cancelReservation } from '../api/seat';
+import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import SeatCanvas from './SeatCanvas';
 
@@ -13,8 +14,9 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
   const [viewMode, setViewMode] = useState('canvas'); // 'grid' or 'canvas'
   const [isEditMode, setIsEditMode] = useState(false); // Lifted state to control refresh
 
+  const [users, setUsers] = useState([]);
+
   const fetchSeats = async () => {
-    // Only set loading on initial load to avoid flickering on refresh
     if (seats.length === 0) setLoading(true);
     try {
       const data = await getLibrarySeats(libraryId);
@@ -26,6 +28,21 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
       setLoading(false);
     }
   };
+
+  const fetchUsers = async () => {
+    if (!libraryId) return;
+    try {
+      const response = await axiosClient.get(`/library/${libraryId}/users?limit=1000`);
+      // Adapt based on backend response structure (might be response.data or response.data.users)
+      setUsers(response.data.users || response.data || []);
+    } catch (err) {
+      console.error("Failed to fetch library users for reservation logic", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [libraryId]);
 
   useEffect(() => {
     fetchSeats();
@@ -47,11 +64,34 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
     }
   };
 
+  const handleSeatReservation = async (seatId, reservationData) => {
+    try {
+      await reserveSeat(seatId, reservationData);
+      toast.success("Seat reserved successfully");
+      setRefreshTrigger(prev => prev + 1);
+      setSelectedSeat(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to reserve seat");
+    }
+  };
+
+  const handleCancelReservation = async (seatId) => {
+    try {
+      await cancelReservation(seatId);
+      toast.success("Reservation cancelled");
+      setRefreshTrigger(prev => prev + 1);
+      setSelectedSeat(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to cancel reservation");
+    }
+  };
+
   const stats = {
     total: seats.length,
     occupied: seats.filter(s => s.status === 'Occupied').length,
     available: seats.filter(s => s.status === 'Available').length,
     maintenance: seats.filter(s => s.status === 'Maintenance').length,
+    reserved: seats.filter(s => s.status === 'Reserved').length,
   };
 
   const categories = ['All', ...new Set(seats.map(s => s.category))];
@@ -102,7 +142,7 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
           <StatCard label="Total Capacity" value={stats.total} color="bg-gray-100" />
           <StatCard label="Available" value={stats.available} color="bg-green-100 text-green-800" />
           <StatCard label="Occupied" value={stats.occupied} color="bg-red-100 text-red-800" />
-          <StatCard label="Maintenance" value={stats.maintenance} color="bg-yellow-100 text-yellow-800" />
+          <StatCard label="Reserved" value={stats.reserved} color="bg-blue-100 text-blue-800" />
         </div>
       </div>
 
@@ -170,6 +210,9 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
           seat={selectedSeat}
           onClose={() => setSelectedSeat(null)}
           onUpdate={handleSeatUpdate}
+          onReserve={handleSeatReservation}
+          onCancelReservation={handleCancelReservation}
+          users={users}
         />
       )}
     </div>
@@ -195,17 +238,32 @@ const getStatusColor = (status) => {
   }
 };
 
-const SeatDetailModal = ({ seat, onClose, onUpdate }) => {
+const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservation, users }) => {
+  const [showReserveForm, setShowReserveForm] = useState(false);
+  const [reservationForm, setReservationForm] = useState({
+    userId: '',
+    reservationType: 'FullDay',
+    startTime: '09:00',
+    endTime: '17:00'
+  });
+
   const occupant = seat.currentOccupant || { name: "Unknown", email: "N/A" };
+  const reserver = seat.reservedBy || { name: "Unknown", email: "N/A" };
   const isOccupied = seat.status === 'Occupied';
   const isMaintenance = seat.status === 'Maintenance';
+  const isReserved = seat.status === 'Reserved';
+
+  const handleReserveSubmit = (e) => {
+    e.preventDefault();
+    onReserve(seat._id, reservationForm);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in duration-200">
 
         {/* Header */}
-        <div className={`p-6 text-center ${isOccupied ? 'bg-red-600' : isMaintenance ? 'bg-amber-500' : 'bg-green-600'}`}>
+        <div className={`p-6 text-center ${isOccupied ? 'bg-red-600' : isMaintenance ? 'bg-amber-500' : isReserved ? 'bg-blue-600' : 'bg-green-600'}`}>
           <Armchair className="text-white mx-auto mb-2" size={48} />
           <h2 className="text-2xl font-bold text-white">Seat {seat.seatNumber}</h2>
           <span className="text-white/90 font-medium text-sm uppercase tracking-wider">{seat.status}</span>
@@ -242,15 +300,129 @@ const SeatDetailModal = ({ seat, onClose, onUpdate }) => {
                   <span>Out: {seat.expectedEndTime ? new Date(seat.expectedEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
                 </div>
               </>
-            ) : (
-              <div className="flex items-center gap-3 text-green-700 bg-green-50 p-4 rounded-xl border border-green-100">
-                <AlertCircle size={20} className="shrink-0" />
-                <span className="text-sm font-medium">Ready to be assigned via QR Scan</span>
+            ) : isReserved ? (
+              <div className="border-t pt-4">
+                <label className="text-xs text-blue-500 uppercase font-bold mb-3 block">Reserved For</label>
+                <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                  {reserver.avatar ? (
+                    <img src={reserver.avatar} alt={reserver.name} className="w-10 h-10 rounded-full object-cover border border-blue-200" />
+                  ) : (
+                    <div className="w-10 h-10 bg-blue-200 text-blue-700 rounded-full flex items-center justify-center font-bold">
+                      {reserver.name ? reserver.name[0] : 'U'}
+                    </div>
+                  )}
+                  <div className="overflow-hidden">
+                    <p className="font-semibold text-gray-900 truncate">{reserver.name}</p>
+                    <p className="text-xs text-blue-600 mt-0.5">{seat.reservationType} (Daily)</p>
+                  </div>
+                </div>
+                {seat.reservationType === 'TimeSlot' && seat.reservedTimeSlots?.length > 0 && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    <strong>Slots:</strong> {seat.reservedTimeSlots.map(s => `${s.startTime}-${s.endTime}`).join(', ')}
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    if (confirm('Are you sure you want to cancel this reservation?')) {
+                      onCancelReservation(seat._id);
+                    }
+                  }}
+                  className="w-full mt-4 py-2 px-4 rounded-xl font-medium text-red-600 hover:bg-red-50 text-sm border border-transparent hover:border-red-100 transition-colors"
+                >
+                  Cancel Reservation
+                </button>
               </div>
+            ) : !isOccupied && !showReserveForm ? (
+              <div className="flex flex-col gap-3 border-t pt-4">
+                <div className="flex items-center gap-3 text-green-700 bg-green-50 p-3 rounded-xl border border-green-100 text-sm font-medium">
+                  <AlertCircle size={20} className="shrink-0" />
+                  <span>Ready to be assigned via QR Scan</span>
+                </div>
+                <button
+                  onClick={() => setShowReserveForm(true)}
+                  className="w-full py-2.5 px-4 rounded-xl font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-sm border border-blue-200"
+                >
+                  Reserve this Seat
+                </button>
+              </div>
+            ) : null}
+
+            {showReserveForm && !isReserved && !isOccupied && (
+              <form onSubmit={handleReserveSubmit} className="border-t pt-4 space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">Select Member</label>
+                  <select
+                    required
+                    value={reservationForm.userId}
+                    onChange={(e) => setReservationForm({ ...reservationForm, userId: e.target.value })}
+                    className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">-- Choose Member --</option>
+                    {users.map(u => (
+                      <option key={u.userId || u._id} value={u.userId || u._id}>{u.userName || u.name} ({u.email})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">Type (Recurs Daily)</label>
+                    <select
+                      value={reservationForm.reservationType}
+                      onChange={(e) => setReservationForm({ ...reservationForm, reservationType: e.target.value })}
+                      className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-gray-50"
+                    >
+                      <option value="FullDay">Full Day</option>
+                      <option value="TimeSlot">Time Slot</option>
+                    </select>
+                  </div>
+                </div>
+
+                {reservationForm.reservationType === 'TimeSlot' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">Start Time</label>
+                      <input
+                        type="time"
+                        required
+                        value={reservationForm.startTime}
+                        onChange={(e) => setReservationForm({ ...reservationForm, startTime: e.target.value })}
+                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-gray-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">End Time</label>
+                      <input
+                        type="time"
+                        required
+                        value={reservationForm.endTime}
+                        onChange={(e) => setReservationForm({ ...reservationForm, endTime: e.target.value })}
+                        className="w-full p-2 border border-gray-200 rounded-lg text-sm bg-gray-50"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReserveForm(false)}
+                    className="flex-1 py-2 text-sm text-gray-500 font-medium hover:bg-gray-100 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-[2] py-2 text-sm text-white font-bold bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
+                  >
+                    Confirm Reservation
+                  </button>
+                </div>
+              </form>
             )}
 
             {/* Maintenance Toggle */}
-            {!isOccupied && (
+            {!isOccupied && !isReserved && !showReserveForm && (
               <button
                 onClick={() => onUpdate(seat._id, isMaintenance ? 'Available' : 'Maintenance')}
                 className={`w-full py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors ${isMaintenance ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'

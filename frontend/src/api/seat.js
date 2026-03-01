@@ -38,3 +38,21 @@ export const checkOut = async () => {
         throw error;
     }
 };
+
+export const reserveSeat = async (seatId, reservationData) => {
+    try {
+        const response = await api.post(`/seats/${seatId}/reserve`, reservationData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const cancelReservation = async (seatId) => {
+    try {
+        const response = await api.post(`/seats/${seatId}/cancel-reservation`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};

@@ -33,7 +33,20 @@ const seatSchema = new Schema({
         type: String,
         enum: ['Available', 'Occupied', 'Maintenance', 'Reserved'],
         default: 'Available'
-    }
+    },
+
+    // Reservation Details
+    reservedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    reservationType: {
+        type: String,
+        enum: ['FullDay', 'TimeSlot'],
+        default: null
+    },
+    reservedTimeSlots: [{
+        startTime: String, // e.g., "10:00"
+        endTime: String    // e.g., "14:00"
+    }],
+    reservationDate: { type: Date, default: null }
 }, { timestamps: true });
 
 // Compound Index: Ensures you can't have two "G-1" seats in the same Library

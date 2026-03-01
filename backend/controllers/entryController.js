@@ -67,6 +67,7 @@ async function assignSeat(library, userId, subscription, dailyStats, session) {
     const expectedEndTime = new Date(Date.now() + remainingMinutes * 60000);
 
     // 3. Find an Available Seat
+    // Note: We only pick 'Available' seats. 'Reserved' seats are explicitly excluded here.
     const randomSeatResult = await Seat.aggregate([
         { $match: { libraryId: library._id, status: 'Available' } },
         { $sample: { size: 1 } }
@@ -149,6 +150,98 @@ async function assignSeat(library, userId, subscription, dailyStats, session) {
 }
 
 // ==========================================
+// 1B. CORE LOGIC: ASSIGN RESERVED SEAT 
+// ==========================================
+async function assignReservedSeat(reservedSeatDoc, library, userId, subscription, dailyStats, session) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. Get Plan Limits
+    const planDoc = await resolvePlan(subscription.planId, library);
+    let hoursPerDay = (planDoc && planDoc.hoursPerDay) ? planDoc.hoursPerDay : 5;
+
+    // 2. Calculate Remaining Time
+    const maxMinutes = hoursPerDay * 60;
+    const usedMinutes = dailyStats.minutesUsed;
+    let remainingMinutes = maxMinutes - usedMinutes;
+
+    if (remainingMinutes <= 0) {
+        throw new Error(`LIMIT: Daily Quota Exceeded! You used ${Math.floor(usedMinutes / 60)}h ${usedMinutes % 60}m of your ${hoursPerDay}h limit.`);
+    }
+
+    const expectedEndTime = new Date(Date.now() + remainingMinutes * 60000);
+
+    // 3. Lock the Reserved Seat (Atomic Write)
+    const seat = await Seat.findOneAndUpdate(
+        { _id: reservedSeatDoc._id, status: 'Reserved' },
+        {
+            status: 'Occupied',
+            currentOccupant: userId,
+            occupiedSince: new Date(),
+            expectedEndTime: expectedEndTime
+        },
+        { new: true, session: session }
+    );
+
+    if (!seat) {
+        throw new Error("RACE: Could not claim reserved seat. It might no longer be reserved.");
+    }
+
+    // 4. Update Attendance Bucket
+    const attendanceDoc = await Attendance.findOneAndUpdate(
+        { userId, libraryId: library._id, date: today },
+        {
+            $push: {
+                sessions: {
+                    seatNumber: seat.seatNumber,
+                    checkInTime: new Date(),
+                    checkOutTime: null,
+                    durationMinutes: 0
+                }
+            },
+            $inc: { sessionCount: 1 }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true, session: session }
+    );
+
+    // 5. Update User Context
+    await User.findByIdAndUpdate(userId, {
+        $set: {
+            'studentDetails.assignedSeat': {
+                seatId: seat._id,
+                seatNumber: seat.seatNumber,
+                checkInTime: new Date(),
+                expectedEndTime: expectedEndTime
+            },
+            'studentDetails.currentSubscription': {
+                subscriptionId: subscription._id,
+                libraryId: library._id,
+                planId: subscription.planId,
+                startDate: subscription.startDate,
+                expiryDate: subscription.expiryDate,
+                status: 'active'
+            },
+            $addToSet: { attendanceHistory: attendanceDoc._id }
+        }
+    }, { session: session });
+
+    // 6. Side Effect: Invalidate Cache
+    authMiddleware.invalidateUserCache(userId);
+
+    // 7. Return Success Data
+    const rHours = Math.floor(remainingMinutes / 60);
+    const rMins = Math.floor(remainingMinutes % 60);
+
+    return {
+        seat: seat.seatNumber,
+        checkinsRemaining: MAX_DAILY_CHECKINS - (dailyStats.sessionsCount + 1),
+        maxDailyCheckins: MAX_DAILY_CHECKINS,
+        remainingTime: { hours: rHours, minutes: rMins },
+        msg: `Checked In to your Reserved Seat: ${seat.seatNumber}`
+    };
+}
+
+// ==========================================
 // 2. CONTROLLER: CHECK-IN
 // ==========================================
 exports.checkIn = async (req, res) => {
@@ -202,7 +295,43 @@ exports.checkIn = async (req, res) => {
 
         // --- SCENARIO A: VALID SUBSCRIPTION ---
         if (activeSub) {
-            const resultData = await assignSeat(library, userId, activeSub, dailyStats, session);
+            // First, see if they have a reserved seat right now
+            const today = new Date();
+            const todayMidnight = new Date(today);
+            todayMidnight.setHours(0, 0, 0, 0);
+
+            const currentTimeStr = today.toTimeString().substring(0, 5); // "HH:MM"
+
+            const userReservedSeat = await Seat.findOne({
+                libraryId: library._id,
+                status: 'Reserved',
+                reservedBy: userId
+            }).session(session);
+
+            let isReservedForNow = false;
+
+            if (userReservedSeat) {
+                if (userReservedSeat.reservationType === 'FullDay') {
+                    // FullDay now means permanent until cancelled
+                    isReservedForNow = true;
+                } else if (userReservedSeat.reservationType === 'TimeSlot') {
+                    // TimeSlot is now a permanently recurring daily reservation
+                    for (const slot of userReservedSeat.reservedTimeSlots) {
+                        if (currentTimeStr >= slot.startTime && currentTimeStr <= slot.endTime) {
+                            isReservedForNow = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let resultData;
+            if (isReservedForNow) {
+                resultData = await assignReservedSeat(userReservedSeat, library, userId, activeSub, dailyStats, session);
+            } else {
+                resultData = await assignSeat(library, userId, activeSub, dailyStats, session);
+            }
+
             await session.commitTransaction();
             return res.json({ success: true, ...resultData });
         }
@@ -337,8 +466,13 @@ exports.checkOut = async (req, res) => {
         if (durationMinutes < 1) durationMinutes = 1;
 
         // 3. Release Seat
+        let newStatus = 'Available';
+        if (seat.reservedBy && seat.reservationType) {
+            newStatus = 'Reserved';
+        }
+
         await Seat.findByIdAndUpdate(seat._id, {
-            status: 'Available',
+            status: newStatus,
             currentOccupant: null,
             occupiedSince: null,
             expectedEndTime: null
@@ -602,6 +736,14 @@ const releaseExpiredSeats = async () => {
                     occupiedSince: null,
                     expectedEndTime: null
                 }, { session });
+
+                // Restore reservation status if it was a reserved seat that just timed out of occupancy
+                // Both FullDay and TimeSlot are permanently recurring until cancelled by an admin.
+                const seatDoc = await Seat.findById(seat._id).session(session);
+                if (seatDoc && seatDoc.reservedBy && seatDoc.reservationType) {
+                    seatDoc.status = 'Reserved';
+                    await seatDoc.save({ session });
+                }
 
                 await session.commitTransaction();
                 releasedCount++;
