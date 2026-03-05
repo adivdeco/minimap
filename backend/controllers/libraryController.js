@@ -285,7 +285,7 @@ const getAllLibraries = async (req, res) => {
     try {
         const {
             page = 1,
-            limit = 20,
+            limit: reqLimit = 20,
             city,
             state,
             isActive,
@@ -296,7 +296,9 @@ const getAllLibraries = async (req, res) => {
             sortOrder = 'desc'
         } = req.query;
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        // Enforce max limit for security
+        const limit = Math.min(parseInt(reqLimit) || 20, 100);
+        const skip = (parseInt(page) - 1) * limit;
 
         // Build filter query
         const filter = {};
@@ -307,10 +309,13 @@ const getAllLibraries = async (req, res) => {
         if (isVerified !== undefined) filter.isVerified = isVerified === 'true';
         if (minRating) filter['rating.average'] = { $gte: parseFloat(minRating) };
         if (search) {
-            filter.$or = [
-                { libraryName: new RegExp(search, 'i') },
-                { description: new RegExp(search, 'i') }
-            ];
+            // Using MongoDB $text index for optimal searching
+            // Note: Make sure the text index is built via LibrarySchema
+            filter.$text = { $search: search };
+
+            // Note: If you want substring matches where words are incomplete, regex is needed
+            // But for performance on large DBs, $text is better. 
+            // If strictly needing substring, keeping regex but with limits is the way. We assume $text here.
         }
 
         // Sort configuration
@@ -329,9 +334,9 @@ const getAllLibraries = async (req, res) => {
             libraries,
             pagination: {
                 total: totalLibraries,
-                totalPages: Math.ceil(totalLibraries / parseInt(limit)),
+                totalPages: Math.ceil(totalLibraries / limit),
                 currentPage: parseInt(page),
-                hasNextPage: parseInt(page) * parseInt(limit) < totalLibraries,
+                hasNextPage: parseInt(page) * limit < totalLibraries,
                 hasPrevPage: parseInt(page) > 1
             }
         });

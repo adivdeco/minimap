@@ -139,4 +139,7 @@ librarySchema.index({ location: '2dsphere' });
 librarySchema.index({ 'address.city': 1, 'address.pincode': 1 });
 librarySchema.index({ 'accessConfig.qrCodeData': 1 });
 
+// Text index for optimized textual search
+librarySchema.index({ libraryName: 'text', description: 'text' });
+
 module.exports = mongoose.model('Library', librarySchema);

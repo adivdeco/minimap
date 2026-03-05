@@ -9,6 +9,7 @@ import { getLibrarySeats } from '../api/seat';
 import { getNotices } from '../api/notice';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useQuery } from '@tanstack/react-query';
 import {
     Library, CalendarDays, Sun, Moon, X, ChevronRight, Users, Bell
 } from 'lucide-react';
@@ -48,12 +49,7 @@ const Home = () => {
     const [showScanner, setShowScanner] = useState(false);
     const [showAttendance, setShowAttendance] = useState(false);
     const [showNotices, setShowNotices] = useState(false);
-    const [unreadNotices, setUnreadNotices] = useState(0);
     const [checkingOut, setCheckingOut] = useState(false);
-
-    // Seat Canvas State
-    const [seats, setSeats] = useState([]);
-    const [loadingSeats, setLoadingSeats] = useState(false);
 
     // Data Extraction
     const activeSeat = user?.studentDetails?.assignedSeat;
@@ -83,38 +79,28 @@ const Home = () => {
     const hasSubscription = !!subscription && subscription.status === 'active';
     const isAdmin = user?.role === 'admin' || user?.role === 'co-admin';
 
-    // --- Effects ---
+    // --- Effects & Queries ---
 
-    useEffect(() => {
-        const fetchSeats = async () => {
-            if (!libraryId) return;
-            setLoadingSeats(true);
-            try {
-                const data = await getLibrarySeats(libraryId);
-                setSeats(data);
-            } catch (error) {
-                console.error("Failed to load seats", error);
-            } finally {
-                setLoadingSeats(false);
-            }
-        };
+    const { data: seats = [], isLoading: loadingSeats } = useQuery({
+        queryKey: ['librarySeats', libraryId],
+        queryFn: async () => {
+            if (!libraryId) return [];
+            return await getLibrarySeats(libraryId);
+        },
+        enabled: !!libraryId,
+        staleTime: 5 * 60 * 1000 // Cache seats for 5 minutes to prevent unnecessary redraws
+    });
 
-        const fetchUnreadNotices = async () => {
-            if (!libraryId) return;
-            try {
-                const data = await getNotices(libraryId, true);
-                setUnreadNotices(data.notices?.length || 0);
-            } catch (error) {
-                console.error("Failed to fetch notices for bell", error);
-            }
-        };
-
-        if (libraryId) {
-            fetchSeats();
-            fetchUnreadNotices();
-        }
-        // Fix: Use primitive values in dependency array to avoid infinite loops
-    }, [libraryId, activeSeat?.seatNumber]);
+    const { data: unreadNoticesCount = 0 } = useQuery({
+        queryKey: ['unreadNotices', libraryId],
+        queryFn: async () => {
+            if (!libraryId) return 0;
+            const data = await getNotices(libraryId, true);
+            return data.notices?.length || 0;
+        },
+        enabled: !!libraryId,
+        refetchInterval: 60000 // Poll every minute for new notices in the background
+    });
 
     // --- Handlers ---
 
@@ -207,7 +193,7 @@ const Home = () => {
                                     title="Notices"
                                 >
                                     <Bell size={18} />
-                                    {unreadNotices > 0 && (
+                                    {unreadNoticesCount > 0 && (
                                         <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                                     )}
                                 </button>
@@ -269,7 +255,7 @@ const Home = () => {
                                         className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all relative"
                                     >
                                         <Bell size={18} />
-                                        {unreadNotices > 0 && (
+                                        {unreadNoticesCount > 0 && (
                                             <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                                         )}
                                     </button>

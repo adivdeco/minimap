@@ -220,4 +220,4 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
     );
 };
 
-export default UserSeatMap;
+export default React.memo(UserSeatMap);

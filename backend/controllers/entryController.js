@@ -686,16 +686,26 @@ const releaseExpiredSeats = async () => {
 
         let releasedCount = 0;
 
+        const seatOps = [];
+        const attendanceOps = [];
+        const userOps = [];
+
         for (const seat of expiredSeats) {
-            const session = await mongoose.startSession();
-            session.startTransaction();
             try {
                 if (!seat.currentOccupant) {
-                    seat.status = 'Available';
-                    seat.occupiedSince = null;
-                    seat.expectedEndTime = null;
-                    await seat.save({ session });
-                    await session.commitTransaction();
+                    seatOps.push({
+                        updateOne: {
+                            filter: { _id: seat._id },
+                            update: {
+                                $set: {
+                                    status: 'Available',
+                                    occupiedSince: null,
+                                    expectedEndTime: null
+                                }
+                            }
+                        }
+                    });
+                    releasedCount++;
                     continue;
                 }
 
@@ -707,52 +717,77 @@ const releaseExpiredSeats = async () => {
                     durationMinutes = Math.round((checkOutTime - seat.occupiedSince) / 60000);
                 }
 
-                const bucketDate = new Date(seat.occupiedSince);
+                const bucketDate = new Date(seat.occupiedSince || now);
                 bucketDate.setHours(0, 0, 0, 0);
 
-                await Attendance.findOneAndUpdate(
-                    {
-                        userId,
-                        libraryId: seat.libraryId,
-                        date: bucketDate,
-                        "sessions.checkOutTime": null
-                    },
-                    {
-                        $set: {
-                            "sessions.$.checkOutTime": checkOutTime,
-                            "sessions.$.durationMinutes": durationMinutes
+                // Queue Attendance Update
+                attendanceOps.push({
+                    updateOne: {
+                        filter: {
+                            userId: userId,
+                            libraryId: seat.libraryId,
+                            date: bucketDate,
+                            "sessions.checkOutTime": null
                         },
-                        $inc: { totalDurationToday: durationMinutes }
-                    },
-                    { session }
-                );
+                        update: {
+                            $set: {
+                                "sessions.$.checkOutTime": checkOutTime,
+                                "sessions.$.durationMinutes": durationMinutes
+                            },
+                            $inc: { totalDurationToday: durationMinutes }
+                        }
+                    }
+                });
 
-                await User.findByIdAndUpdate(userId, { 'studentDetails.assignedSeat': null }, { session });
+                // Queue User Unassignment
+                userOps.push({
+                    updateOne: {
+                        filter: { _id: userId },
+                        update: {
+                            $set: { 'studentDetails.assignedSeat': null }
+                        }
+                    }
+                });
+
+                // Invalidate Cache (Side effect, safe to do in memory)
                 authMiddleware.invalidateUserCache(userId);
 
-                await Seat.findByIdAndUpdate(seat._id, {
-                    status: 'Available',
-                    currentOccupant: null,
-                    occupiedSince: null,
-                    expectedEndTime: null
-                }, { session });
-
-                // Restore reservation status if it was a reserved seat that just timed out of occupancy
-                // Both FullDay and TimeSlot are permanently recurring until cancelled by an admin.
-                const seatDoc = await Seat.findById(seat._id).session(session);
-                if (seatDoc && seatDoc.reservedBy && seatDoc.reservationType) {
-                    seatDoc.status = 'Reserved';
-                    await seatDoc.save({ session });
+                // Determine Seat Status
+                let nextStatus = 'Available';
+                if (seat.reservedBy && seat.reservationType) {
+                    nextStatus = 'Reserved'; // Restore reservation
                 }
 
-                await session.commitTransaction();
+                // Queue Seat Update
+                seatOps.push({
+                    updateOne: {
+                        filter: { _id: seat._id },
+                        update: {
+                            $set: {
+                                status: nextStatus,
+                                currentOccupant: null,
+                                occupiedSince: null,
+                                expectedEndTime: null
+                            }
+                        }
+                    }
+                });
+
                 releasedCount++;
             } catch (innerErr) {
-                await session.abortTransaction();
-                console.error(`Failed to auto-release seat ${seat.seatNumber}:`, innerErr);
-            } finally {
-                session.endSession();
+                console.error(`Failed to prepare release for seat ${seat.seatNumber}:`, innerErr);
             }
+        }
+
+        // Execute Bulk Operations (Extremely fast, reduces locking)
+        if (attendanceOps.length > 0) {
+            await Attendance.bulkWrite(attendanceOps);
+        }
+        if (userOps.length > 0) {
+            await User.bulkWrite(userOps);
+        }
+        if (seatOps.length > 0) {
+            await Seat.bulkWrite(seatOps);
         }
 
         return { releasedCount, message: `Released ${releasedCount} expired seats` };
