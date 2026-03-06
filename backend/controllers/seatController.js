@@ -16,7 +16,8 @@ const getLibrarySeats = async (req, res) => {
         if (!library) return res.status(404).json({ message: "Library not found" });
 
         const seats = await Seat.find({ libraryId })
-            .populate('currentOccupant', 'name') // Only show name to public
+            .populate('currentOccupant', 'name email avatar phone')
+            .populate('reservedBy', 'name email avatar phone')
             .collation({ locale: "en_US", numericOrdering: true }) // Force numeric sort (1, 2, 10)
             .sort({ category: 1, seatNumber: 1 }); // Sort by category then seat number
 

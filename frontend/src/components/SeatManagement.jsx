@@ -180,26 +180,49 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
           </div>
 
           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-            {displayedSeats.map((seat) => (
-              <div
-                key={seat._id}
-                onClick={() => setSelectedSeat(seat)}
-                className={`
+            {displayedSeats.map((seat) => {
+              const occupantName = seat.currentOccupant?.name || seat.reservedBy?.name;
+
+              return (
+                <div
+                  key={seat._id}
+                  onClick={() => setSelectedSeat(seat)}
+                  className={`
                     relative p-2 rounded-xl border-2 cursor-pointer transition transform hover:scale-105
                     flex flex-col items-center justify-center h-20 shadow-sm
-                    ${getStatusColor(seat.status)}
+                    ${getStatusColor(seat)}
                 `}
-              >
-                <span className="text-[10px] font-bold uppercase opacity-70 mb-0.5 truncate w-full text-center">{seat.category}</span>
-                <span className="text-lg font-bold">{seat.seatNumber}</span>
+                >
+                  <span className="text-[10px] font-bold uppercase opacity-70 mb-0.5 truncate w-full text-center">{seat.category}</span>
+                  <span className="text-lg font-bold">{seat.seatNumber}</span>
 
-                {seat.status === 'Occupied' && (
-                  <div className="absolute top-1 right-1">
-                    <User size={12} className="text-red-700" />
-                  </div>
-                )}
-              </div>
-            ))}
+                  {seat.status === 'Occupied' && (
+                    <div className="absolute top-1 right-1">
+                      {seat.reservedBy ? (
+                        <User size={12} className="text-purple-700" />
+                      ) : (
+                        <User size={12} className="text-red-700" />
+                      )}
+                    </div>
+                  )}
+                  {seat.status === 'Reserved' && (
+                    <div className="absolute top-1 right-1 flex gap-0.5">
+                      <User size={12} className="text-blue-700" />
+                    </div>
+                  )}
+
+                  {seat.reservedBy && seat.status === 'Occupied' ? (
+                    <span className="absolute bottom-1 w-full text-center text-[9px] font-bold truncate px-1 opacity-80 text-purple-800">
+                      {seat.reservedBy.name}
+                    </span>
+                  ) : occupantName ? (
+                    <span className="absolute bottom-1 w-full text-center text-[9px] font-bold truncate px-1 opacity-80">
+                      {occupantName}
+                    </span>
+                  ) : null}
+                </div>
+              )
+            })}
           </div>
         </>
       )}
@@ -228,8 +251,11 @@ const StatCard = ({ label, value, color }) => (
   </div>
 );
 
-const getStatusColor = (status) => {
-  switch (status) {
+const getStatusColor = (seat) => {
+  if (seat.status === 'Occupied' && seat.reservedBy) {
+    return 'bg-purple-100 border-purple-500 text-purple-800'; // Special color for Occupied + Reserved
+  }
+  switch (seat.status) {
     case 'Available': return 'bg-white border-green-500 text-green-700 hover:bg-green-50';
     case 'Occupied': return 'bg-red-50 border-red-500 text-red-700';
     case 'Reserved': return 'bg-blue-50 border-blue-500 text-blue-700';
@@ -292,12 +318,19 @@ const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservati
                     <div className="overflow-hidden">
                       <p className="font-semibold text-gray-900 truncate">{occupant.name}</p>
                       <p className="text-xs text-gray-500 truncate">{occupant.email}</p>
+                      {occupant.phone && <p className="text-xs text-gray-500 truncate mt-0.5">Ph: {occupant.phone}</p>}
                     </div>
                   </div>
                 </div>
-                <div className="mt-2 flex justify-between text-xs text-gray-400">
-                  <span>In: {seat.occupiedSince ? new Date(seat.occupiedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
-                  <span>Out: {seat.expectedEndTime ? new Date(seat.expectedEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
+                <div className="mt-2 text-xs text-gray-500 space-y-1 bg-white p-2 border border-gray-100 rounded-lg">
+                  <div className="flex justify-between">
+                    <span className="font-medium">Checked In:</span>
+                    <span>{seat.occupiedSince ? new Date(seat.occupiedSince).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Expected Out:</span>
+                    <span>{seat.expectedEndTime ? new Date(seat.expectedEndTime).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}</span>
+                  </div>
                 </div>
               </>
             ) : isReserved ? (
@@ -314,6 +347,8 @@ const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservati
                   <div className="overflow-hidden">
                     <p className="font-semibold text-gray-900 truncate">{reserver.name}</p>
                     <p className="text-xs text-blue-600 mt-0.5">{seat.reservationType} (Daily)</p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{reserver.email}</p>
+                    {reserver.phone && <p className="text-xs text-gray-500 truncate">Ph: {reserver.phone}</p>}
                   </div>
                 </div>
                 {seat.reservationType === 'TimeSlot' && seat.reservedTimeSlots?.length > 0 && (

@@ -15,7 +15,8 @@ const {
     generateSeatsForLibrary,
     getLibraryUsers,
     getUserAnalytics,
-    getLibraryStatistics
+    getLibraryStatistics,
+    updateUserContactInfo
 } = require('../controllers/libraryController');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -40,6 +41,7 @@ router.post('/generate-seats', authMiddleware, generateSeatsForLibrary);
 // Library Owner - User & Analytics Routes
 router.get('/:libraryId/users', authMiddleware, getLibraryUsers);
 router.get('/:libraryId/user/:userId/analytics', authMiddleware, getUserAnalytics);
+router.put('/:libraryId/user/:userId/contact', authMiddleware, updateUserContactInfo);
 router.get('/:libraryId/statistics', authMiddleware, getLibraryStatistics);
 
 module.exports = router;

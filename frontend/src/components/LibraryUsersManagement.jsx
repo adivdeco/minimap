@@ -3,9 +3,10 @@ import { useParams } from 'react-router-dom';
 import {
   Users, CheckCircle, DollarSign, Activity, Clock, Calendar, Search,
   Filter, ChevronLeft, ChevronRight, X, Download, MoreVertical,
-  ArrowUpRight, MapPin, Plus, TrendingUp, AlertTriangle, FileText, Gift
+  ArrowUpRight, MapPin, Plus, TrendingUp, AlertTriangle, FileText, Gift, Edit2, Check
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient'; // Assuming you use this for auth interceptors
+import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- IMPORT YOUR UTILITIES HERE ---
@@ -243,6 +244,12 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
           <UserAnalyticsModal
             analytics={userAnalytics}
             libraryName={statistics?.library?.name || "Library"}
+            libraryId={libraryId}
+            onUpdateUser={(updatedUser) => {
+              setUserAnalytics(prev => ({ ...prev, user: { ...prev.user, ...updatedUser } }));
+              // Update user object in the list
+              setUsers(prev => prev.map(u => u.userId === updatedUser._id ? { ...u, phone: updatedUser.phone } : u));
+            }}
             onClose={() => { setUserAnalytics(null); setSelectedUser(null); }}
           />
         )}
@@ -350,7 +357,11 @@ const UserCard = ({ user, onClick }) => {
   );
 };
 
-const UserAnalyticsModal = ({ analytics, libraryName, onClose }) => {
+const UserAnalyticsModal = ({ analytics, libraryName, libraryId, onUpdateUser, onClose }) => {
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [editPhoneValue, setEditPhoneValue] = useState(analytics.user.phone || '');
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+
   // Utilize helper functions
   const insights = generateUserInsights(analytics);
   const subInfo = getSubscriptionInfo(analytics.subscription);
@@ -410,7 +421,88 @@ const UserAnalyticsModal = ({ analytics, libraryName, onClose }) => {
 
           <img src={analytics.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(analytics.user.name)}&background=random`} alt="user" className="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-[#121214] shadow-xl mb-3" />
           <h2 className="text-xl font-bold">{analytics.user.name}</h2>
-          <p className="text-sm text-gray-500 mt-1">{analytics.user.phone} • {analytics.user.email}</p>
+
+          <div className="flex flex-col items-center gap-2 mt-2 w-full max-w-xs">
+            {isEditingPhone ? (
+              <div className="flex flex-col w-full gap-2 bg-gray-50 dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-white/10 animate-in fade-in zoom-in duration-200">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Update Phone Number</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editPhoneValue}
+                  onChange={(e) => setEditPhoneValue(e.target.value)}
+                  className="w-full text-sm text-center bg-white dark:bg-[#1A1A1C] border border-gray-300 dark:border-white/20 rounded-lg px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500/50 focus:outline-none placeholder-gray-400"
+                  placeholder="Enter new phone number"
+                  disabled={isUpdatingPhone}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      setIsUpdatingPhone(true);
+                      try {
+                        const res = await axiosClient.put(`/library/${libraryId}/user/${analytics.user._id}/contact`, { phone: editPhoneValue });
+                        toast.success('Contact updated successfully');
+                        onUpdateUser({ _id: analytics.user._id, phone: res.data.phone });
+                        setIsEditingPhone(false);
+                      } catch (err) {
+                        toast.error(err.response?.data?.message || 'Failed to update contact');
+                      } finally {
+                        setIsUpdatingPhone(false);
+                      }
+                    } else if (e.key === 'Escape') {
+                      setEditPhoneValue(analytics.user.phone || '');
+                      setIsEditingPhone(false);
+                    }
+                  }}
+                />
+                <div className="flex gap-2.5 mt-1 relative z-10 w-full justify-between items-center text-sm font-medium">
+                  <button
+                    onClick={() => { setEditPhoneValue(analytics.user.phone || ''); setIsEditingPhone(false); }}
+                    disabled={isUpdatingPhone}
+                    className="flex-1 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsUpdatingPhone(true);
+                      try {
+                        const res = await axiosClient.put(`/library/${libraryId}/user/${analytics.user._id}/contact`, { phone: editPhoneValue });
+                        toast.success('Contact updated successfully');
+                        onUpdateUser({ _id: analytics.user._id, phone: res.data.phone });
+                        setIsEditingPhone(false);
+                      } catch (err) {
+                        toast.error(err.response?.data?.message || 'Failed to update contact');
+                      } finally {
+                        setIsUpdatingPhone(false);
+                      }
+                    }}
+                    disabled={isUpdatingPhone || !editPhoneValue.trim()}
+                    className="flex-1 flex justify-center items-center py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400 rounded-lg transition-colors shadow-sm"
+                  >
+                    {isUpdatingPhone ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : (
+                      <span className="flex items-center gap-1"><Check size={14} /> Save</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-2 bg-gray-50 dark:bg-white/5 py-1.5 px-3 rounded-full border border-gray-100 dark:border-white/5 group transition-colors hover:border-purple-200 dark:hover:border-purple-500/30">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    {analytics.user.phone ? analytics.user.phone : <span className="text-gray-400 italic">No Phone Added</span>}
+                  </p>
+                  <button
+                    onClick={() => setIsEditingPhone(true)}
+                    className="flex justify-center items-center w-6 h-6 bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 text-purple-600 dark:text-purple-400 rounded-full shadow-sm hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:border-purple-200 transition-all focus:outline-none"
+                    title="Edit phone number"
+                  >
+                    <Edit2 size={10} />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1.5">{analytics.user.email}</p>
+              </div>
+            )}
+            {!isEditingPhone && editPhoneValue !== analytics.user.phone && <span className="hidden"></span> /* Spacer */}
+          </div>
 
           <div className="flex flex-wrap gap-3 w-full justify-center mt-6">
             <div className="flex-1 min-w-[100px] text-center px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">

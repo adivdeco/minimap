@@ -1311,7 +1311,6 @@ const getLibraryStatistics = async (req, res) => {
     }
 };
 
-module.exports = {
     addLibrary,
     updateLibrary,
     getAllLibraries,
@@ -1327,4 +1326,67 @@ module.exports = {
     getLibraryUsers,
     getUserAnalytics,
     getLibraryStatistics
+
+// @desc    Update user contact info in a library
+// @route   PUT /api/library/:libraryId/user/:userId/contact
+const updateUserContactInfo = async (req, res) => {
+    try {
+        const ownerId = req.finduser._id;
+        const ownerRole = req.finduser.role;
+        const { libraryId, userId } = req.params;
+        const { phone } = req.body;
+
+        if (!phone) {
+            return res.status(400).json({ message: "Phone number is required" });
+        }
+
+        // Verify library ownership
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        const isOwner = library.ownerId.toString() === ownerId.toString();
+        if (ownerRole !== 'admin' && ownerRole !== 'co-admin' && !isOwner) {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to update user details in this library"
+            });
+        }
+
+        // Fetch user data
+        const user = await User.findByIdAndUpdate(userId, { phone }, { new: true });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({
+            message: "User contact updated successfully",
+            phone: user.phone
+        });
+
+    } catch (error) {
+        console.error('Error updating user contact info:', error);
+        res.status(500).json({
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+module.exports = {
+    addLibrary,
+    updateLibrary,
+    getAllLibraries,
+    getLibraryById,
+    getMyLibraries,
+    getNearbyLibraries,
+    deleteLibrary,
+    toggleLibraryStatus,
+    rateLibrary,
+    deleteReview,
+    regenerateQRCode,
+    generateSeatsForLibrary,
+    getLibraryUsers,
+    getUserAnalytics,
+    getLibraryStatistics,
+    updateUserContactInfo
 };

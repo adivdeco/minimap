@@ -22,8 +22,11 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, scale }) 
     const currentX = position?.x ?? seat.x ?? 0;
     const currentY = position?.y ?? seat.y ?? 0;
 
-    const getStatusStyles = (status) => {
-        switch (status) {
+    const getStatusStyles = (seat) => {
+        if (seat.status === 'Occupied' && seat.reservedBy) {
+            return 'bg-purple-100 border-purple-500 text-purple-800 ring-purple-200';
+        }
+        switch (seat.status) {
             case 'Available':
                 return 'bg-white border-green-500 text-green-700 hover:bg-green-50 ring-green-200';
             case 'Occupied':
@@ -54,7 +57,7 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, scale }) 
                 className={`
                     absolute w-12 h-12 rounded-lg border-2 shadow-sm flex flex-col items-center justify-center select-none z-10 touch-none
                     transition-colors duration-200
-                    ${getStatusStyles(seat.status)}
+                    ${getStatusStyles(seat)}
                     ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:shadow-md hover:ring-2' : 'cursor-pointer hover:scale-105'}
                 `}
                 onClick={(e) => {
@@ -73,7 +76,12 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, scale }) 
 
                 {/* Status Indicator Icon */}
                 {seat.status === 'Occupied' && (
-                    <div className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-0.5 border border-red-200 shadow-sm">
+                    <div className={`absolute -top-2 -right-2 rounded-full p-0.5 border shadow-sm ${seat.reservedBy ? 'bg-purple-100 text-purple-600 border-purple-200' : 'bg-red-100 text-red-600 border-red-200'}`}>
+                        <User size={12} />
+                    </div>
+                )}
+                {seat.status === 'Reserved' && (
+                    <div className="absolute -top-2 -right-2 bg-blue-100 text-blue-600 rounded-full p-0.5 border border-blue-200 shadow-sm">
                         <User size={12} />
                     </div>
                 )}
