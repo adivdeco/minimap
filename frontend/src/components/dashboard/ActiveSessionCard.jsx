@@ -87,13 +87,13 @@ const ActiveSessionCard = ({
                     <div className="mt-8 pt-6 border-t border-white/5 flex flex-wrap items-center gap-8">
                         <div>
                             <p className="text-xs text-gray-500 uppercase font-bold mb-1">Remaining Time</p>
-                            <div className="text-xl font-mono text-white">
+                            <div className="text-xl text-black font-mono dark:text-gray-100">
                                 <CountdownTimer targetDate={activeSeat.expectedEndTime} />
                             </div>
                         </div>
-                        <div>
+                        <div >
                             <p className="text-xs text-gray-500 uppercase font-bold mb-1">Check-in Time</p>
-                            <p className="text-xl text-white font-mono">
+                            <p className="text-xl text-black font-mono dark:text-gray-100">
                                 {new Date(activeSeat.startTime || new Date()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                             </p>
                         </div>

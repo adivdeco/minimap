@@ -81,8 +81,8 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                 return `${base} ${size} bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-700 cursor-not-allowed`;
             case 'Occupied': // Since we only show layout, occupied might look different
                 return `${base} ${size} bg-gray-200 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-500`;
-            case 'Reserved':
-                return `${base} ${size} bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400`;
+            // case 'Reserved':
+            //     return `${base} ${size} bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400`;
             default: // Available/Standard
                 return `${base} ${size} bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-600/50 text-gray-400 dark:text-slate-400 hover:border-purple-500 hover:text-purple-500 hover:bg-gray-50 dark:hover:bg-slate-700`;
         }
@@ -107,10 +107,10 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                         <div className="w-3 h-3 rounded bg-gray-200 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Taken</span>
                     </div>
-                    <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+                    {/* <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
                         <div className="w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Reserved</span>
-                    </div>
+                    </div> */}
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Empty</span>

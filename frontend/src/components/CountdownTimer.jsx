@@ -40,7 +40,7 @@ const CountdownTimer = ({ targetDate }) => {
     const pad = (n) => n.toString().padStart(2, '0');
 
     return (
-        <div className="flex items-center gap-2 text-2xl font-mono font-bold text-white bg-black/20 px-4 py-2 rounded-lg border border-white/10">
+        <div className="flex items-center gap-2 text-2xl font-mono font-bold text-black dark:text-white bg-gray-200 dark:bg-black/80 px-4 py-2 rounded-lg border border-white/10 dark:border-black/10">
             <Clock className="text-purple-400 animate-pulse" size={24} />
             <div className="flex items-baseline gap-1">
                 <span>{pad(timeLeft.hours)}</span>
