@@ -53,6 +53,10 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+app.get('/', (req, res) => {
+    res.send('✅ JWT Server is running or server is live');
+});
+
 // Apply Rate Limiting
 app.use('/api', apiLimiter);
 
