@@ -48,11 +48,57 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
         if (containerRef.current) containerRef.current.style.cursor = 'grab';
     };
 
+    // --- Touch Handlers ---
+    const [initialPinchDistance, setInitialPinchDistance] = useState(null);
+    const [initialScale, setInitialScale] = useState(1);
+
+    const handleTouchStart = (e) => {
+        if (e.touches.length === 1) {
+            setIsDragging(true);
+            setDragStart({
+                x: e.touches[0].clientX - position.x,
+                y: e.touches[0].clientY - position.y
+            });
+        } else if (e.touches.length === 2) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            setInitialPinchDistance(dist);
+            setInitialScale(scale);
+            setIsDragging(false); // Disable panning while pinching
+        }
+    };
+
+    const handleTouchMove = (e) => {
+        // Prevent default behavior to stop page scrolling while interacting with the map
+        if (e.cancelable) e.preventDefault();
+
+        if (e.touches.length === 1 && isDragging) {
+            setPosition({
+                x: e.touches[0].clientX - dragStart.x,
+                y: e.touches[0].clientY - dragStart.y
+            });
+        } else if (e.touches.length === 2 && initialPinchDistance) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const newScale = Math.min(Math.max(0.5, initialScale * (dist / initialPinchDistance)), 3);
+            setScale(newScale);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        setIsDragging(false);
+        setInitialPinchDistance(null);
+    };
+
     const handleWheel = (e) => {
         if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            const newScale = Math.min(Math.max(0.5, scale + delta), 2);
+            const newScale = Math.min(Math.max(0.5, scale + delta), 3); // Increased max zoom to 3
             setScale(newScale);
         }
     };
@@ -123,7 +169,7 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                         <ZoomOut size={16} />
                     </button>
                     <span className="w-12 text-center text-xs font-mono text-gray-500 dark:text-gray-400">{Math.round(scale * 100)}%</span>
-                    <button onClick={() => setScale(s => Math.min(2, s + 0.2))} className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    <button onClick={() => setScale(s => Math.min(3, s + 0.2))} className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                         <ZoomIn size={16} />
                     </button>
                     <div className="w-px h-4 bg-gray-300 dark:bg-white/10 mx-1"></div>
@@ -135,12 +181,16 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
 
             {/* --- THE CANVAS --- */}
             <div
-                className="relative w-full h-[600px] bg-gray-50 dark:bg-[#050505] rounded-3xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-2xl group transition-colors"
+                className="relative w-full h-[600px] bg-gray-50 dark:bg-[#050505] rounded-3xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-2xl group transition-colors touch-none"
                 ref={containerRef}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
                 onWheel={handleWheel}
                 style={{ cursor: 'grab' }}
             >
