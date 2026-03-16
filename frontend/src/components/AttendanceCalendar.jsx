@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from './Navbar';
-
+import { AttendanceChart } from './dashboard/attendenceChart';
 const AttendanceCalendar = () => {
     const { theme } = useTheme();
     const [attendanceMap, setAttendanceMap] = useState({});
@@ -346,6 +346,11 @@ const AttendanceCalendar = () => {
                             </AnimatePresence>
                         </div>
                     </div>
+                </div>
+
+                {/* --- Chart View --- */}
+                <div className="mt-8">
+                    <AttendanceChart />
                 </div>
             </div>
         </div>
