@@ -38,7 +38,7 @@ export function AttendanceChart() {
           // Process history into chart format and sort by date
           const processedData = response.history
             .map((item) => {
-              const dateObj = new Date(item.date)
+              const dateObj = new Date(item.date)              
               return {
                 date: item.date, // original date string
                 formattedDate: dateObj.toLocaleDateString("en-US", {
@@ -128,7 +128,7 @@ export function AttendanceChart() {
               bottom: 12,
             }}
           >
-            <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" opacity={0.3} />
+            <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="10 4" opacity={1} />
             <XAxis
               dataKey="formattedDate"
               tickLine={false}
@@ -156,11 +156,32 @@ export function AttendanceChart() {
                 />
               }
             />
+            <defs>
+              <linearGradient id="glassGloss" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+                <stop offset="25%" stopColor="#10b981" stopOpacity={0.5}/>
+                <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
+              </linearGradient>
+
+              {/* Advanced Glass Texture Filter */}
+              <filter id="glassTexture" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
+                <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
+                
+                {/* Create the glass base */}
+                <feComposite operator="in" in="coloredNoise" in2="SourceGraphic" result="texture" />
+                <feBlend mode="overlay" in="texture" in2="SourceGraphic" result="glassBase" />
+              </filter>
+            </defs>
             <Bar 
               dataKey="duration" 
-              fill="currentColor" 
-              radius={[4, 4, 0, 0]}
-              className="fill-indigo-500 dark:fill-indigo-400 hover:fill-indigo-600 dark:hover:fill-indigo-300 transition-colors"
+              fill="url(#glassGloss)"
+              stroke="white"
+              strokeWidth={1}
+              strokeOpacity={0.4}
+              filter="url(#glassTexture)"
+              radius={[8, 8, 0, 0]}
+              className="drop-shadow-[0_8px_16px_rgba(16,185,129,0.25)] hover:drop-shadow-[0_12px_24px_rgba(16,185,129,0.4)] transition-all duration-300"
             />
           </BarChart>
         </ChartContainer>
