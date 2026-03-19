@@ -33,7 +33,7 @@ const useLocationCache = () => {
                 setError(err.message || "Unable to retrieve your location. Please grant location permissions.");
                 setLoading(false);
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 }
         );
     };
 

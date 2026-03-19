@@ -1,10 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
 import { getNearbyLibraries } from '../api/library';
 import useLocationCache from '../hooks/useLocationCache';
-import { Navigation, RefreshCw, AlertCircle } from 'lucide-react';
+import { Navigation, RefreshCw, AlertCircle, Target, MapPinOff } from 'lucide-react';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icons in React Leaflet with Vite
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+const RecenterControl = ({ position }) => {
+    const map = useMap();
+    return (
+        <div style={{ position: 'absolute', bottom: '24px', right: '12px', zIndex: 1000 }}>
+            <button
+                onClick={(e) => { e.preventDefault(); map.setView(position, 13); }}
+                className="bg-white dark:bg-[#1A1A1F] p-3 rounded-full shadow-lg border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:text-purple-600 hover:scale-110 transition-all focus:outline-none"
+                title="Recenter Map"
+            >
+                <Target size={22} />
+            </button>
+        </div>
+    );
+};
 
 // Custom red icon for the user's location
 const userIcon = new L.Icon({
@@ -107,6 +135,26 @@ const NearbyLibrariesMap = () => {
 
             {/* Map Container */}
             <div className="flex-1 relative z-0">
+                
+                {/* Overlay for fetching */}
+                {fetchingLibs && (
+                    <div className="absolute inset-0 z-[1000] bg-white/40 dark:bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center transition-all">
+                        <div className="w-12 h-12 rounded-full border-4 border-purple-500 border-t-transparent animate-spin mb-4 shadow-lg"></div>
+                        <p className="font-semibold text-gray-900 dark:text-white bg-white/80 dark:bg-black/80 px-4 py-2 rounded-full shadow">Finding nearby libraries...</p>
+                    </div>
+                )}
+
+                {/* No libraries found overlay */}
+                {!fetchingLibs && libraries.length === 0 && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-white dark:bg-[#1A1A1F] px-6 py-3 rounded-2xl shadow-lg border border-gray-200 dark:border-white/10 flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
+                        <MapPinOff className="text-orange-500" size={24} />
+                        <div>
+                            <p className="font-semibold text-gray-900 dark:text-white text-sm">No libraries found</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Try increasing the radius</p>
+                        </div>
+                    </div>
+                )}
+
                 <MapContainer center={userPos} zoom={13} scrollWheelZoom={true} style={{ height: "100%", width: "100%" }}>
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -158,6 +206,8 @@ const NearbyLibrariesMap = () => {
                             </Marker>
                         );
                     })}
+
+                    <RecenterControl position={userPos} />
                 </MapContainer>
             </div>
 
