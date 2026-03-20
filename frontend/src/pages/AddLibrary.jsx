@@ -15,6 +15,7 @@ const AddLibrary = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
@@ -108,7 +109,7 @@ const AddLibrary = () => {
             const libraryPayload = {
                 libraryName: formData.libraryName,
                 description: formData.description,
-                images: formData.image ? [{ url: formData.image, isMain: true }] : [],
+                image: formData.image,
                 totalSeats: parseInt(formData.totalSeats),
                 location: {
                     coordinates: [parseFloat(formData.longitude), parseFloat(formData.latitude)],
@@ -225,6 +226,7 @@ const AddLibrary = () => {
                                     <ImageUpload 
                                         label="Library Showcase Image" 
                                         onUploadSuccess={(data) => setFormData(prev => ({ ...prev, image: data.url }))} 
+                                        onUploadingStateChange={setIsUploadingImage}
                                     />
                                 </div>
                             </div>
@@ -559,16 +561,16 @@ const AddLibrary = () => {
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || isUploadingImage}
                         className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg rounded-xl hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-50 dark:focus:ring-offset-[#0f0f0f] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                     >
-                        {loading ? (
+                        {loading || isUploadingImage ? (
                             <span className="flex items-center justify-center gap-2">
                                 <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
-                                Adding Library...
+                                {isUploadingImage ? 'Waiting for Image Upload...' : 'Adding Library...'}
                             </span>
                         ) : (
                             'Add Library'

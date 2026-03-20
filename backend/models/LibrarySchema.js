@@ -105,6 +105,7 @@ const librarySchema = new Schema({
             createdAt: { type: Date, default: Date.now }
         }]
     },
+    image: String,
     images: [{
         url: String,
         caption: String,

@@ -111,7 +111,7 @@ const LibraryDetails = () => {
             <div className="relative h-[400px] w-full z-10">
                 <div className="absolute inset-0">
                     <img
-                        src={library.images?.[0]?.url || "https://i.pinimg.com/736x/0f/b5/24/0fb524592eedc447dcdd179a00962555.jpg"}
+                        src={library.image || library.images?.[0]?.url || "https://i.pinimg.com/736x/0f/b5/24/0fb524592eedc447dcdd179a00962555.jpg"}
                         alt={library.libraryName}
                         className="w-full h-full object-cover"
                     />

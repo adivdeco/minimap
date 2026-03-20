@@ -22,6 +22,7 @@ const EditLibrary = () => {
     const [library, setLibrary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
@@ -56,7 +57,7 @@ const EditLibrary = () => {
                 setFormData({
                     libraryName: lib.libraryName || '',
                     description: lib.description || '',
-                    image: lib.images?.[0]?.url || '',
+                    image: lib.image || lib.images?.[0]?.url || '',
                     totalSeats: lib.totalSeats || '',
                     longitude: lib.location?.coordinates?.[0] || '',
                     latitude: lib.location?.coordinates?.[1] || '',
@@ -117,7 +118,7 @@ const EditLibrary = () => {
             const updatePayload = {
                 libraryName: formData.libraryName,
                 description: formData.description,
-                images: formData.image ? [{ url: formData.image, isMain: true }] : [],
+                image: formData.image,
                 totalSeats: parseInt(formData.totalSeats),
                 location: {
                     coordinates: [parseFloat(formData.longitude), parseFloat(formData.latitude)],
@@ -215,6 +216,7 @@ const EditLibrary = () => {
                                         label="Library Showcase Image" 
                                         currentImage={formData.image}
                                         onUploadSuccess={(data) => setFormData(prev => ({ ...prev, image: data.url }))} 
+                                        onUploadingStateChange={setIsUploadingImage}
                                     />
                                 </div>
                             </div>
@@ -342,9 +344,9 @@ const EditLibrary = () => {
                         </div>
                     </div>
 
-                    <button type="submit" disabled={saving}
+                    <button type="submit" disabled={saving || isUploadingImage}
                         className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50">
-                        {saving ? 'Saving...' : 'Update Library'}
+                        {(saving || isUploadingImage) ? (isUploadingImage ? 'Waiting for Image Upload...' : 'Saving...') : 'Update Library'}
                     </button>
                 </form>
             </div>

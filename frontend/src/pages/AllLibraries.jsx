@@ -211,9 +211,9 @@ const AllLibraries = () => {
                             >
                                 {/* Image Section */}
                                 <div className="relative h-48 shrink-0 overflow-hidden bg-gray-100 dark:bg-white/5">
-                                    {lib.images?.[0]?.url ? (
+                                    {(lib.image || lib.images?.[0]?.url) ? (
                                         <img
-                                            src={lib.images[0].url}
+                                            src={lib.image || lib.images[0].url}
                                             alt={lib.libraryName}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                         />

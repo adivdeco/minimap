@@ -33,6 +33,7 @@ const addLibrary = async (req, res) => {
             totalSeats,
             plans,
             businessHours,
+            image,
             images,
             // Owner details
             ownerName,
@@ -149,6 +150,7 @@ const addLibrary = async (req, res) => {
             totalSeats,
             plans: plans || [],
             businessHours: businessHours || {},
+            image: image || "",
             images: images || [],
             isActive: true,
             isVerified: false

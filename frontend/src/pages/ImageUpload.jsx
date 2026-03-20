@@ -47,7 +47,7 @@ const compressImage = (file, maxWidth = 1000, maxHeight = 1000, quality = 0.7) =
     });
 };
 
-const ImageUpload = ({ label = "Image", onUploadSuccess, onAvatarUpdate, currentImage }) => {
+const ImageUpload = ({ label = "Image", onUploadSuccess, onAvatarUpdate, currentImage, onUploadingStateChange }) => {
     const [uploading, setUploading] = useState(false);
     const [preview, setPreview] = useState(currentImage || null);
     const [error, setError] = useState('');
@@ -57,6 +57,7 @@ const ImageUpload = ({ label = "Image", onUploadSuccess, onAvatarUpdate, current
         if (!file) return;
 
         setUploading(true);
+        if (onUploadingStateChange) onUploadingStateChange(true);
         setError('');
 
         try {
@@ -75,6 +76,7 @@ const ImageUpload = ({ label = "Image", onUploadSuccess, onAvatarUpdate, current
                     if (onAvatarUpdate) onAvatarUpdate(localPreviewUrl);
                     if (onUploadSuccess) onUploadSuccess({ url: localPreviewUrl, file: compressedFile });
                     setUploading(false);
+                    if (onUploadingStateChange) onUploadingStateChange(false);
                 }, 1000);
                 return;
             }
@@ -107,6 +109,7 @@ const ImageUpload = ({ label = "Image", onUploadSuccess, onAvatarUpdate, current
             setError('Failed to upload image. Please try again.');
         } finally {
             setUploading(false);
+            if (onUploadingStateChange) onUploadingStateChange(false);
         }
     };
 
