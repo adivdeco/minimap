@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useTheme } from '../context/ThemeContext';
-import { Check, Star, MapPin, Phone, Globe, Clock, Shield, Zap, X, ChevronRight } from 'lucide-react';
+import { Check, Star, MapPin, Phone, Globe, Clock, Shield, Zap, X, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import SmartLibraryScanner from '../components/SmartLibraryScanner';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -171,6 +171,24 @@ const LibraryDetails = () => {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Photo Gallery */}
+                        {library.images && library.images.length > 0 && (
+                            <div className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
+                                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                                    <ImageIcon className="text-purple-600 dark:text-purple-400" />
+                                    Photo Gallery
+                                </h2>
+                                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-6 pt-2 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                    {library.images.map((img, index) => (
+                                        <div key={index} className="relative w-72 h-72 sm:w-80 sm:h-80 shrink-0 snap-center rounded-2xl overflow-hidden group cursor-pointer border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5 shadow-sm hover:shadow-lg dark:hover:shadow-purple-500/10 transition-all">
+                                            <img src={img.url} alt={`Gallery ${index + 1} for ${library.libraryName}`} className="w-full h-full object-cover sm:group-hover:scale-105 transition-transform duration-500" />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Pricing Plans */}
                         <div>

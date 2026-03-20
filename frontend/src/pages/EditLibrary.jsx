@@ -6,8 +6,10 @@ import PrintQrComponent from '../components/qrCodeData';
 import SeatManagement from '../components/SeatManagement';
 import PlanManagement from '../components/PlanManagement';
 import MapLocationPicker from '../components/MapLocationPicker';
+// import BusinessHoursForm from '../components/BusinessHoursForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ImageUpload from './ImageUpload';
+import MultiImageUpload from '../components/MultiImageUpload';
 
 const AMENITIES_OPTIONS = [
     'High-Speed WiFi', 'AC', 'Non-AC', 'Personal Cabin',
@@ -30,6 +32,7 @@ const EditLibrary = () => {
         libraryName: '',
         description: '',
         image: '',
+        images: [],
         totalSeats: '',
         longitude: '',
         latitude: '',
@@ -58,6 +61,7 @@ const EditLibrary = () => {
                     libraryName: lib.libraryName || '',
                     description: lib.description || '',
                     image: lib.image || lib.images?.[0]?.url || '',
+                    images: lib.images ? lib.images.map(img => img.url) : [],
                     totalSeats: lib.totalSeats || '',
                     longitude: lib.location?.coordinates?.[0] || '',
                     latitude: lib.location?.coordinates?.[1] || '',
@@ -119,6 +123,7 @@ const EditLibrary = () => {
                 libraryName: formData.libraryName,
                 description: formData.description,
                 image: formData.image,
+                images: formData.images.map(url => ({ url, isMain: false })),
                 totalSeats: parseInt(formData.totalSeats),
                 location: {
                     coordinates: [parseFloat(formData.longitude), parseFloat(formData.latitude)],
@@ -213,9 +218,17 @@ const EditLibrary = () => {
                             <div className="md:col-span-2">
                                 <div className="mt-2 p-4 bg-white/5 border border-white/10 rounded-lg">
                                     <ImageUpload 
-                                        label="Library Showcase Image" 
+                                        label="Main Showcase Image" 
                                         currentImage={formData.image}
                                         onUploadSuccess={(data) => setFormData(prev => ({ ...prev, image: data.url }))} 
+                                        onUploadingStateChange={setIsUploadingImage}
+                                    />
+                                </div>
+                                <div className="mt-4 p-4 bg-white/5 border border-white/10 rounded-lg">
+                                    <MultiImageUpload 
+                                        label="Additional Gallery Photos" 
+                                        currentImages={formData.images}
+                                        onChange={(urls) => setFormData(prev => ({ ...prev, images: urls }))} 
                                         onUploadingStateChange={setIsUploadingImage}
                                     />
                                 </div>

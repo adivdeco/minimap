@@ -4,6 +4,7 @@ import { addLibrary } from '../api/library';
 import { useAuth } from '../context/AuthContext';
 import MapLocationPicker from '../components/MapLocationPicker';
 import ImageUpload from './ImageUpload';
+import MultiImageUpload from '../components/MultiImageUpload';
 
 const AMENITIES_OPTIONS = [
     'High-Speed WiFi', 'AC', 'Non-AC', 'Personal Cabin',
@@ -23,6 +24,7 @@ const AddLibrary = () => {
         libraryName: '',
         description: '',
         image: '',
+        images: [],
         totalSeats: '',
         // Location
         longitude: '',
@@ -110,6 +112,7 @@ const AddLibrary = () => {
                 libraryName: formData.libraryName,
                 description: formData.description,
                 image: formData.image,
+                images: formData.images.map(url => ({ url, isMain: false })),
                 totalSeats: parseInt(formData.totalSeats),
                 location: {
                     coordinates: [parseFloat(formData.longitude), parseFloat(formData.latitude)],
@@ -224,8 +227,18 @@ const AddLibrary = () => {
                             <div className="md:col-span-2">
                                 <div className="p-4 border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5">
                                     <ImageUpload 
-                                        label="Library Showcase Image" 
+                                        label="Main Showcase Image" 
                                         onUploadSuccess={(data) => setFormData(prev => ({ ...prev, image: data.url }))} 
+                                        onUploadingStateChange={setIsUploadingImage}
+                                    />
+                                </div>
+
+                                {/* Additional Images Gallery */}
+                                <div className="p-4 border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5">
+                                    <MultiImageUpload 
+                                        label="Actionable Gallery Photos (Optional)" 
+                                        currentImages={formData.images}
+                                        onChange={(urls) => setFormData(prev => ({ ...prev, images: urls }))} 
                                         onUploadingStateChange={setIsUploadingImage}
                                     />
                                 </div>
