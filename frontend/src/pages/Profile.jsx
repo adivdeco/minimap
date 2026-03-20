@@ -171,7 +171,7 @@ const Profile = () => {
                                 <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20">
                                     <div className="w-full h-full rounded-full bg-[#0b0f19] overflow-hidden flex items-center justify-center">
                                         {user?.avatar ? (
-                                            <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                                            <img src={user.avatar} alt="Profile" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                                         ) : (
                                             <span className="text-4xl font-bold text-white">{user?.name?.charAt(0)?.toUpperCase()}</span>
                                         )}

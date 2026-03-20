@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { addLibrary } from '../api/library';
 import { useAuth } from '../context/AuthContext';
 import MapLocationPicker from '../components/MapLocationPicker';
+import ImageUpload from './ImageUpload';
 
 const AMENITIES_OPTIONS = [
     'High-Speed WiFi', 'AC', 'Non-AC', 'Personal Cabin',
@@ -20,6 +21,7 @@ const AddLibrary = () => {
     const [formData, setFormData] = useState({
         libraryName: '',
         description: '',
+        image: '',
         totalSeats: '',
         // Location
         longitude: '',
@@ -106,6 +108,7 @@ const AddLibrary = () => {
             const libraryPayload = {
                 libraryName: formData.libraryName,
                 description: formData.description,
+                images: formData.image ? [{ url: formData.image, isMain: true }] : [],
                 totalSeats: parseInt(formData.totalSeats),
                 location: {
                     coordinates: [parseFloat(formData.longitude), parseFloat(formData.latitude)],
@@ -216,6 +219,14 @@ const AddLibrary = () => {
                                     className="w-full px-4 py-3 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
                                     placeholder="Brief description of the library"
                                 />
+                            </div>
+                            <div className="md:col-span-2">
+                                <div className="p-4 border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5">
+                                    <ImageUpload 
+                                        label="Library Showcase Image" 
+                                        onUploadSuccess={(data) => setFormData(prev => ({ ...prev, image: data.url }))} 
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Total Seats *</label>

@@ -309,7 +309,7 @@ const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservati
                   <label className="text-xs text-gray-500 uppercase font-bold mb-3 block">Occupied By</label>
                   <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
                     {occupant.avatar ? (
-                      <img src={occupant.avatar} alt={occupant.name} className="w-10 h-10 rounded-full object-cover" />
+                      <img src={occupant.avatar} alt={occupant.name} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover" />
                     ) : (
                       <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold">
                         {occupant.name ? occupant.name[0] : 'U'}
@@ -338,7 +338,7 @@ const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservati
                 <label className="text-xs text-blue-500 uppercase font-bold mb-3 block">Reserved For</label>
                 <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
                   {reserver.avatar ? (
-                    <img src={reserver.avatar} alt={reserver.name} className="w-10 h-10 rounded-full object-cover border border-blue-200" />
+                    <img src={reserver.avatar} alt={reserver.name} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover border border-blue-200" />
                   ) : (
                     <div className="w-10 h-10 bg-blue-200 text-blue-700 rounded-full flex items-center justify-center font-bold">
                       {reserver.name ? reserver.name[0] : 'U'}

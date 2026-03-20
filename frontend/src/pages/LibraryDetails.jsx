@@ -278,7 +278,7 @@ const LibraryDetails = () => {
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-2">
                                                     {review.userId?.avatar ? (
-                                                        <img src={review.userId.avatar} alt="User" className="w-8 h-8 rounded-full border border-purple-500/50" />
+                                                        <img src={review.userId.avatar} alt="User" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-purple-500/50" />
                                                     ) : (
                                                         <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">
                                                             {review.userId?.name?.[0] || 'U'}

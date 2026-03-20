@@ -285,7 +285,7 @@ function AllUsers() {
                                             <div className="flex items-center space-x-4">
                                                 <div className="flex-shrink-0">
                                                     {user.avatar ? (
-                                                        <img src={user.avatar} alt="" className="w-12 h-12 rounded-full object-cover border" />
+                                                        <img src={user.avatar} alt="" referrerPolicy="no-referrer" className="w-12 h-12 rounded-full object-cover border" />
                                                     ) : (
                                                         <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold text-lg">
                                                             {user.name?.charAt(0).toUpperCase()}

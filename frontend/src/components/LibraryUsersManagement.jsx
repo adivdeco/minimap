@@ -309,7 +309,7 @@ const UserCard = ({ user, onClick }) => {
     <motion.div layout onClick={onClick} className="group relative bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-2xl p-5 cursor-pointer hover:border-purple-500/50 hover:shadow-lg transition-all active:scale-[0.98] flex flex-col justify-between h-full">
       <div className="flex items-start gap-4 mb-4">
         <div className="relative">
-          <img src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName)}&background=random`} alt="avatar" className="w-14 h-14 rounded-full object-cover border-2 border-gray-100 dark:border-white/5" />
+          <img src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.userName)}&background=random`} alt="avatar" referrerPolicy="no-referrer" className="w-14 h-14 rounded-full object-cover border-2 border-gray-100 dark:border-white/5" />
           <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#0F0F12]" style={{ backgroundColor: statusColor }}></div>
         </div>
         <div className="flex-1 min-w-0">
@@ -419,7 +419,7 @@ const UserAnalyticsModal = ({ analytics, libraryName, libraryId, onUpdateUser, o
             <X size={18} />
           </button>
 
-          <img src={analytics.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(analytics.user.name)}&background=random`} alt="user" className="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-[#121214] shadow-xl mb-3" />
+          <img src={analytics.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(analytics.user.name)}&background=random`} alt="user" referrerPolicy="no-referrer" className="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-[#121214] shadow-xl mb-3" />
           <h2 className="text-xl font-bold">{analytics.user.name}</h2>
 
           <div className="flex flex-col items-center gap-2 mt-2 w-full max-w-xs">

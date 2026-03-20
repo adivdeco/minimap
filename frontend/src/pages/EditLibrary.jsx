@@ -7,6 +7,7 @@ import SeatManagement from '../components/SeatManagement';
 import PlanManagement from '../components/PlanManagement';
 import MapLocationPicker from '../components/MapLocationPicker';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ImageUpload from './ImageUpload';
 
 const AMENITIES_OPTIONS = [
     'High-Speed WiFi', 'AC', 'Non-AC', 'Personal Cabin',
@@ -27,6 +28,7 @@ const EditLibrary = () => {
     const [formData, setFormData] = useState({
         libraryName: '',
         description: '',
+        image: '',
         totalSeats: '',
         longitude: '',
         latitude: '',
@@ -54,6 +56,7 @@ const EditLibrary = () => {
                 setFormData({
                     libraryName: lib.libraryName || '',
                     description: lib.description || '',
+                    image: lib.images?.[0]?.url || '',
                     totalSeats: lib.totalSeats || '',
                     longitude: lib.location?.coordinates?.[0] || '',
                     latitude: lib.location?.coordinates?.[1] || '',
@@ -114,6 +117,7 @@ const EditLibrary = () => {
             const updatePayload = {
                 libraryName: formData.libraryName,
                 description: formData.description,
+                images: formData.image ? [{ url: formData.image, isMain: true }] : [],
                 totalSeats: parseInt(formData.totalSeats),
                 location: {
                     coordinates: [parseFloat(formData.longitude), parseFloat(formData.latitude)],
@@ -204,6 +208,15 @@ const EditLibrary = () => {
                                 <label className="block text-sm font-medium text-gray-200 mb-2">Description</label>
                                 <textarea name="description" value={formData.description} onChange={handleChange} rows={3}
                                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                            </div>
+                            <div className="md:col-span-2">
+                                <div className="mt-2 p-4 bg-white/5 border border-white/10 rounded-lg">
+                                    <ImageUpload 
+                                        label="Library Showcase Image" 
+                                        currentImage={formData.image}
+                                        onUploadSuccess={(data) => setFormData(prev => ({ ...prev, image: data.url }))} 
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-200 mb-2">

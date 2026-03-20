@@ -85,7 +85,7 @@ const Navbar = () => {
                                     className="flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer group"
                                 >
                                     {user?.avatar ? (
-                                        <img src={user.avatar} alt="Profile" className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
+                                        <img src={user.avatar} alt="Profile" referrerPolicy="no-referrer" className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold shadow-inner text-white">
                                             {user?.name?.charAt(0)?.toUpperCase()}
@@ -125,7 +125,7 @@ const Navbar = () => {
                                     className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer group"
                                 >
                                     {user?.avatar ? (
-                                        <img src={user.avatar} alt="Profile" className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
+                                        <img src={user.avatar} alt="Profile" referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold shadow-inner text-white">
                                             {user?.name?.charAt(0)?.toUpperCase()}
