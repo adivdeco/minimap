@@ -137,9 +137,9 @@ const LibraryDetails = () => {
                             <h1 className="text-4xl md:text-6xl font-bold text-white mb-2">{library.libraryName}</h1>
                             <p className="text-lg text-gray-300 md:max-w-2xl text-shadow-sm">{library.description}</p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 hidden md:flex">
                             <button
-                                className="px-6 py-3 bg-white text-gray-900 rounded-xl font-bold hover:bg-gray-100 transition-colors shadow-lg shadow-white/10"
+                                className="px-8 py-3 bg-white text-gray-900 rounded-xl font-bold hover:bg-gray-100 transition-colors shadow-lg shadow-white/10 text-lg"
                                 onClick={() => setShowScanner(true)}
                             >
                                 Book a Seat
@@ -150,7 +150,7 @@ const LibraryDetails = () => {
             </div>
 
             {/* Main Content */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-28 md:pb-12 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                     {/* Left Column - Details */}
@@ -179,9 +179,9 @@ const LibraryDetails = () => {
                                     <ImageIcon className="text-purple-600 dark:text-purple-400" />
                                     Photo Gallery
                                 </h2>
-                                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-6 pt-2 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-6 pt-2 pl-2 pr-6 -ml-2 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                     {library.images.map((img, index) => (
-                                        <div key={index} className="relative w-72 h-72 sm:w-80 sm:h-80 shrink-0 snap-center rounded-2xl overflow-hidden group cursor-pointer border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5 shadow-sm hover:shadow-lg dark:hover:shadow-purple-500/10 transition-all">
+                                        <div key={index} className="relative w-72 h-72 sm:w-80 sm:h-80 shrink-0 snap-start rounded-2xl overflow-hidden group cursor-pointer border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-white/5 shadow-sm hover:shadow-lg dark:hover:shadow-purple-500/10 transition-all">
                                             <img src={img.url} alt={`Gallery ${index + 1} for ${library.libraryName}`} className="w-full h-full object-cover sm:group-hover:scale-105 transition-transform duration-500" />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                                         </div>
@@ -196,9 +196,9 @@ const LibraryDetails = () => {
                                 <Shield className="text-purple-600 dark:text-purple-400" />
                                 Membership Plans
                             </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex md:grid md:grid-cols-2 gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory pb-6 pt-2 pl-2 pr-6 -ml-2 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                 {library.plans?.map((plan, index) => (
-                                    <div key={index} className={`relative bg-white dark:bg-[#18181b] border ${plan.isPopular ? 'border-purple-500 dark:border-purple-500/50 shadow-lg shadow-purple-500/10' : 'border-gray-200 dark:border-white/10'} rounded-2xl p-6 transition-all hover:scale-[1.02] group`}>
+                                    <div key={index} className={`relative shrink-0 snap-start w-[280px] sm:w-[320px] md:w-auto bg-white dark:bg-[#18181b] border ${plan.isPopular ? 'border-purple-500 dark:border-purple-500/50 shadow-lg shadow-purple-500/10' : 'border-gray-200 dark:border-white/10'} rounded-2xl p-6 transition-all hover:scale-[1.02] group flex flex-col`}>
 
                                         {/* Popular Badge */}
                                         {plan.isPopular && (
@@ -220,20 +220,20 @@ const LibraryDetails = () => {
                                         </div>
 
                                         {/* Features List */}
-                                        <div className="space-y-3 mb-6">
+                                        <div className="space-y-3 mb-6 flex-1">
                                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                                                <Clock size={16} className="text-purple-500" />
+                                                <Clock size={16} className="text-purple-500 shrink-0" />
                                                 <span>{plan.hoursPerDay} hours per day</span>
                                             </div>
                                             {plan.features?.map((feature, i) => (
                                                 <div key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                                                    <Check size={16} className="text-green-500" />
+                                                    <Check size={16} className="text-green-500 shrink-0" />
                                                     <span>{feature}</span>
                                                 </div>
                                             ))}
                                             {plan.trialDays > 0 && (
                                                 <div className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium">
-                                                    <Star size={16} fill="currentColor" />
+                                                    <Star size={16} fill="currentColor" className="shrink-0" />
                                                     <span>Includes {plan.trialDays}-day free trial</span>
                                                 </div>
                                             )}
@@ -404,6 +404,17 @@ const LibraryDetails = () => {
                     </div>
 
                 </div>
+            </div>
+
+            {/* Sticky Mobile Bottom Booking Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 pb-6 bg-white/85 dark:bg-[#050505]/95 backdrop-blur-xl border-t border-gray-200 dark:border-white/10 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.3)] z-40">
+                <button
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-[0_8px_20px_-8px_rgba(147,51,234,0.5)] active:scale-95 transition-all flex items-center justify-center gap-2"
+                    onClick={() => setShowScanner(true)}
+                >
+                    <Zap size={20} className="fill-current" />
+                    Book a Seat Now
+                </button>
             </div>
 
             {/* Scanner Modal */}
