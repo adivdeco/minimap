@@ -1,3 +1,4 @@
+console.log("🚀 Starting server...");
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
