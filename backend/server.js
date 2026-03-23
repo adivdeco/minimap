@@ -16,10 +16,10 @@ const planRoutes = require('./routes/planRoutes');
 const noticeRoutes = require('./routes/noticeRoutes');
 
 // Connect to database
-connectDB();
+// connectDB();
 
 // Initialize Cron Jobs
-initScheduler();
+// initScheduler();
 
 const app = express();
 
