@@ -6,8 +6,8 @@ const dotenv = require('dotenv');
 // Load env vars
 dotenv.config();
 
-const connectDB = require('./config/db');
-const initScheduler = require('./scheduler');
+// const connectDB = require('./config/db');
+// const initScheduler = require('./scheduler');
 const authRoutes = require('./routes/authRoutes');
 const libraryRoutes = require('./routes/libraryRoutes');
 const seatRoutes = require('./routes/seatRoutes');
