@@ -1,4 +1,3 @@
-console.log("🚀 Starting server...");
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -7,8 +6,8 @@ const dotenv = require('dotenv');
 // Load env vars
 dotenv.config();
 
-// const connectDB = require('./config/db');
-// const initScheduler = require('./scheduler');
+const connectDB = require('./config/db');
+const initScheduler = require('./scheduler');
 const authRoutes = require('./routes/authRoutes');
 const libraryRoutes = require('./routes/libraryRoutes');
 const seatRoutes = require('./routes/seatRoutes');
@@ -17,10 +16,10 @@ const planRoutes = require('./routes/planRoutes');
 const noticeRoutes = require('./routes/noticeRoutes');
 
 // Connect to database
-// connectDB();
+connectDB();
 
 // Initialize Cron Jobs
-// initScheduler();
+initScheduler();
 
 const app = express();
 
