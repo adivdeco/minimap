@@ -70,3 +70,10 @@ export const getLibraryShiftAnalytics = async (libraryId, date) => {
     });
     return response.data;
 };
+
+export const getLibraryAttendanceDayDetails = async (libraryId, date) => {
+    const response = await axiosClient.get(`/library/${libraryId}/attendance-day-details`, {
+        params: { date }
+    });
+    return response.data;
+};

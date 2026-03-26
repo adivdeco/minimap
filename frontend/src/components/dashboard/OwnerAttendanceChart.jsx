@@ -16,7 +16,14 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { getLibraryAttendanceChart } from "../../api/library"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { getLibraryAttendanceChart, getLibraryAttendanceDayDetails } from "../../api/library"
 
 const chartConfig = {
   sessions: {
@@ -28,6 +35,11 @@ const chartConfig = {
 export function OwnerAttendanceChart({ libraryId }) {
   const [chartData, setChartData] = React.useState([])
   const [loading, setLoading] = React.useState(true)
+
+  // Dialog State
+  const [selectedDayObj, setSelectedDayObj] = React.useState(null)
+  const [dayDetails, setDayDetails] = React.useState([])
+  const [loadingDetails, setLoadingDetails] = React.useState(false)
   
   // Initialize to current month and year
   const currentDate = new Date()
@@ -74,6 +86,25 @@ export function OwnerAttendanceChart({ libraryId }) {
       fetchData()
     }
   }, [libraryId, currentMonth, currentYear])
+
+  // Fetch detailed user information when a bar is clicked
+  React.useEffect(() => {
+    const fetchDetails = async () => {
+      if (!selectedDayObj) return;
+      setLoadingDetails(true);
+      try {
+        const response = await getLibraryAttendanceDayDetails(libraryId, selectedDayObj.date);
+        if (response.success) {
+          setDayDetails(response.users || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch detailed attendees:", error);
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+    fetchDetails();
+  }, [libraryId, selectedDayObj]);
 
   const totalSessions = React.useMemo(() => {
     return chartData.reduce((acc, curr) => acc + curr.sessions, 0)
@@ -235,13 +266,84 @@ export function OwnerAttendanceChart({ libraryId }) {
                     strokeOpacity={0.4}
                     filter="url(#glassTextureOwner)"
                     radius={[8, 8, 0, 0]}
-                    className="drop-shadow-[0_8px_16px_rgba(99,102,241,0.25)] hover:drop-shadow-[0_12px_24px_rgba(99,102,241,0.4)] transition-all duration-300"
+                    className="drop-shadow-[0_8px_16px_rgba(99,102,241,0.25)] hover:drop-shadow-[0_12px_24px_rgba(99,102,241,0.4)] transition-all duration-300 cursor-pointer"
+                    onClick={(data) => {
+                      if (data && data.payload) {
+                        setSelectedDayObj(data.payload);
+                      }
+                    }}
                     />
                 </BarChart>
                 </ChartContainer>
             )
         )}
       </CardContent>
+
+      <Dialog open={!!selectedDayObj} onOpenChange={(open) => !open && setSelectedDayObj(null)}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-[2rem] shadow-2xl overflow-hidden p-0 gap-0">
+          <DialogHeader className="px-6 py-5 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20">
+            <DialogTitle className="text-xl">Attendees on {selectedDayObj?.fullDate}</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400 mt-1">
+              Total complete visits: <span className="font-bold text-slate-700 dark:text-slate-300">{dayDetails.length}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto px-6 py-5 bg-white dark:bg-slate-900">
+            {loadingDetails ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+              </div>
+            ) : dayDetails.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-slate-50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                <p className="text-sm text-slate-500 dark:text-slate-400">No detailed records found for this day.</p>
+              </div>
+            ) : (
+              dayDetails.map((u) => (
+                <div key={u.id} className="flex items-start justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-white/5 transition-all hover:bg-slate-100 dark:hover:bg-slate-800/80 shadow-sm hover:shadow-md">
+                  <div className="flex items-start gap-4">
+                    {u.avatar ? (
+                      <img src={u.avatar} alt={u.name} className="w-12 h-12 rounded-full object-cover shadow-sm bg-white" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/40 font-bold flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm text-lg">
+                        {u.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex flex-col">
+                        <span className="text-base font-bold text-slate-800 dark:text-slate-200 leading-tight tracking-tight">{u.name}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{u.email}</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        {u.sessions && u.sessions.map((session, idx) => (
+                          <div key={idx} className="flex items-center gap-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-medium text-slate-600 dark:text-slate-300 shadow-sm w-fit">
+                            <span className={`w-1.5 h-1.5 rounded-full ${session.outTime === 'On Seat Now' ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                            <span>{session.inTime} → <span className={session.outTime === 'On Seat Now' ? 'text-green-600 dark:text-green-400 font-bold' : ''}>{session.outTime}</span></span>
+                            {session.seatNumber && session.seatNumber !== 'N/A' && (
+                              <>
+                                <span className="border-l border-slate-300 dark:border-slate-700 h-3 mx-1"></span>
+                                <span className="text-slate-500 font-bold flex items-center gap-1">
+                                  Seat: {session.seatNumber}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end justify-between self-stretch pt-1 min-w-[3.5rem]">
+                    <span className="text-xs sm:text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/20">
+                      {Math.floor(u.totalMinutes/60)}:{u.totalMinutes%60}m
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold text-center mt-2 shadow-sm border whitespace-nowrap ${u.planName.toLowerCase().includes('active') || u.planName !== 'No Active Plan' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50' : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
+                      {u.planName}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

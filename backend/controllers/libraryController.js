@@ -1487,14 +1487,18 @@ const getLibraryShiftAnalytics = async (req, res) => {
 
         const Attendance = require('../models/Attendance');
 
-        // Parse requested date
-        const targetDate = new Date(date);
-        targetDate.setHours(0, 0, 0, 0);
+        // The shift chart organicly determines its dates from Local Time in frontend
+        const [yearStr, monthStr, dayStr] = date.split('-');
+        const targetStartDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+        targetStartDate.setHours(0, 0, 0, 0);
+        
+        const targetEndDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+        targetEndDate.setHours(23, 59, 59, 999);
 
         // Fetch attendance records for this library for exactly this date bucket
         const attendanceRecords = await Attendance.find({
             libraryId,
-            date: targetDate
+            date: { $gte: targetStartDate, $lte: targetEndDate }
         });
 
         const shiftCounts = {
@@ -1551,6 +1555,108 @@ const getLibraryShiftAnalytics = async (req, res) => {
     }
 };
 
+// @desc    Get detailed user attendance for a specific day
+// @route   GET /api/library/:libraryId/attendance-day-details
+const getLibraryAttendanceDayDetails = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const role = req.finduser.role;
+        const { libraryId } = req.params;
+        const { date } = req.query; // YYYY-MM-DD
+
+        if (!date) {
+            return res.status(400).json({ message: "Date query parameter is required (YYYY-MM-DD)" });
+        }
+
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        const isOwner = library.ownerId.toString() === userId.toString();
+        if (role !== 'admin' && role !== 'co-admin' && !isOwner) {
+            return res.status(403).json({ message: "Forbidden: You do not have access" });
+        }
+
+        const Attendance = require('../models/Attendance');
+        const Subscription = require('../models/Subscription');
+
+        // Sync local UTC mapping with charting endpoint
+        const targetStartDate = new Date(`${date}T00:00:00.000Z`);
+        const targetEndDate = new Date(`${date}T23:59:59.999Z`);
+
+        // Fetch attendance records and populate user details
+        const records = await Attendance.find({ 
+            libraryId, 
+            date: { $gte: targetStartDate, $lte: targetEndDate } 
+        }).populate('userId', 'name email avatar phone');
+
+        const validRecords = records.filter(r => r.userId); // filter out deleted users
+        const userIds = validRecords.map(r => r.userId._id);
+
+        // Fetch active subscriptions to get plan information
+        const subscriptions = await Subscription.find({
+            libraryId,
+            userId: { $in: userIds },
+            status: 'active'
+        });
+
+        // Map sub by userId
+        const subMap = new Map();
+        subscriptions.forEach(sub => {
+            subMap.set(sub.userId.toString(), sub);
+        });
+
+        // Format data
+        const detailedUsers = validRecords.map(record => {
+            const uidStr = record.userId._id.toString();
+            const sub = subMap.get(uidStr);
+
+            // Build session details
+            const sessionDetails = [];
+            if (record.sessions) {
+                record.sessions.forEach(session => {
+                    if (session.checkInTime) {
+                        const inTime = new Date(session.checkInTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                        const outTime = session.checkOutTime 
+                            ? new Date(session.checkOutTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) 
+                            : 'On Seat Now';
+                        const seatNumber = session.seatNumber || 'N/A';
+                        sessionDetails.push({ inTime, outTime, seatNumber });
+                    }
+                });
+            }
+
+            return {
+                id: uidStr,
+                name: record.userId.name,
+                email: record.userId.email,
+                avatar: record.userId.avatar || '',
+                phone: record.userId.phone || 'N/A',
+                planName: sub ? (sub.planName || 'Active Plan') : 'No Active Plan',
+                totalSessions: record.sessionCount,
+                totalMinutes: record.totalDurationToday || 0,
+                sessions: sessionDetails
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Day details retrieved successfully",
+            date,
+            users: detailedUsers
+        });
+
+    } catch (error) {
+        console.error('Error fetching attendance day details:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     addLibrary,
     updateLibrary,
@@ -1569,5 +1675,6 @@ module.exports = {
     getLibraryStatistics,
     updateUserContactInfo,
     getLibraryAttendanceChart,
-    getLibraryShiftAnalytics
+    getLibraryShiftAnalytics,
+    getLibraryAttendanceDayDetails
 };
