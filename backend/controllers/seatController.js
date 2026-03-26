@@ -1,6 +1,8 @@
 const Seat = require('../models/Seat');
 const Library = require('../models/LibrarySchema');
 const Subscription = require('../models/Subscription');
+const User = require('../models/User');
+const Attendance = require('../models/Attendance');
 
 // @desc    Get all seats for a specific library
 // @route   GET /api/seats/library/:libraryId
@@ -63,10 +65,16 @@ const updateSeat = async (req, res) => {
             seat.seatNumber = seatNumber;
         }
 
+        // Track if we need to evict a user
+        const previousOccupantId = seat.currentOccupant;
+        let wasEvicted = false;
+
         // Owners & Admins can change Status
         if (status) seat.status = status;
+        
         // If status changes to Available, clear occupant
         if (status === 'Available') {
+            if (seat.currentOccupant) wasEvicted = true;
             seat.currentOccupant = null;
             seat.occupiedSince = null;
 
@@ -77,8 +85,43 @@ const updateSeat = async (req, res) => {
         }
 
         if (status === 'Maintenance') {
+            if (seat.currentOccupant) wasEvicted = true;
             seat.currentOccupant = null;
             seat.occupiedSince = null;
+        }
+
+        // --- ENFORCE USER & ATTENDANCE CLEANUP IF EVICTED ---
+        if (wasEvicted && previousOccupantId) {
+            try {
+                // 1. Clear User.assignedSeat
+                const user = await User.findById(previousOccupantId);
+                if (user && user.studentDetails && user.studentDetails.assignedSeat && user.studentDetails.assignedSeat.seatId.toString() === id.toString()) {
+                    user.studentDetails.assignedSeat = null;
+                    await user.save();
+                }
+
+                // 2. Clear Active Attendance Session
+                const attendance = await Attendance.findOne({ 
+                    userId: previousOccupantId, 
+                    libraryId: seat.libraryId 
+                }).sort({ createdAt: -1 });
+
+                if (attendance && attendance.sessions && attendance.sessions.length > 0) {
+                    const lastSession = attendance.sessions[attendance.sessions.length - 1];
+                    if (lastSession.seatNumber === seat.seatNumber && !lastSession.checkOutTime) {
+                        const now = new Date();
+                        lastSession.checkOutTime = now;
+                        
+                        const diffInMs = now.getTime() - new Date(lastSession.checkInTime).getTime();
+                        lastSession.durationMinutes = Math.floor(diffInMs / 60000);
+
+                        attendance.totalDurationToday = (attendance.totalDurationToday || 0) + lastSession.durationMinutes;
+                        await attendance.save();
+                    }
+                }
+            } catch (err) {
+                console.error("Error syncing User and Attendance during force vacate:", err);
+            }
         }
 
         // If they want to re-categorize a seat manually
