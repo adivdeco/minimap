@@ -16,7 +16,8 @@ const {
     getLibraryUsers,
     getUserAnalytics,
     getLibraryStatistics,
-    updateUserContactInfo
+    updateUserContactInfo,
+    getLibraryAttendanceChart
 } = require('../controllers/libraryController');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -43,5 +44,6 @@ router.get('/:libraryId/users', authMiddleware, getLibraryUsers);
 router.get('/:libraryId/user/:userId/analytics', authMiddleware, getUserAnalytics);
 router.put('/:libraryId/user/:userId/contact', authMiddleware, updateUserContactInfo);
 router.get('/:libraryId/statistics', authMiddleware, getLibraryStatistics);
+router.get('/:libraryId/attendance-chart', authMiddleware, getLibraryAttendanceChart);
 
 module.exports = router;

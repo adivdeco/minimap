@@ -1374,6 +1374,90 @@ const updateUserContactInfo = async (req, res) => {
         });
     }
 };
+// @desc    Get detailed attendance chart data for a specific month
+// @route   GET /api/library/:libraryId/attendance-chart
+const getLibraryAttendanceChart = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const role = req.finduser.role;
+        const { libraryId } = req.params;
+        const { month, year } = req.query;
+
+        // Basic validation
+        if (!month || !year) {
+            return res.status(400).json({ message: "Month and year are required query parameters" });
+        }
+
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        const isOwner = library.ownerId.toString() === userId.toString();
+        if (role !== 'admin' && role !== 'co-admin' && !isOwner) {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to library statistics"
+            });
+        }
+
+        const Attendance = require('../models/Attendance');
+
+        // Parse dates for the requested month
+        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        startDate.setHours(0, 0, 0, 0);
+
+        const endDate = new Date(parseInt(year), parseInt(month), 0); // Last day of the month
+        endDate.setHours(23, 59, 59, 999);
+
+        // Fetch attendance records for this library within the date range
+        const attendanceRecords = await Attendance.find({
+            libraryId,
+            date: { $gte: startDate, $lte: endDate }
+        });
+
+        // Initialize a map for all days in the month
+        const daysInMonth = endDate.getDate();
+        const dailyDataMap = new Map();
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            // Create a standardized date string (YYYY-MM-DD) for keys
+            const dateStr = new Date(parseInt(year), parseInt(month) - 1, i).toISOString().split('T')[0];
+            dailyDataMap.set(dateStr, {
+                date: dateStr,
+                totalSessions: 0,
+                totalDurationMinutes: 0
+            });
+        }
+
+        // Aggregate data
+        attendanceRecords.forEach(record => {
+            const dateStr = new Date(record.date).toISOString().split('T')[0];
+            if (dailyDataMap.has(dateStr)) {
+                const dayData = dailyDataMap.get(dateStr);
+                dayData.totalSessions += record.sessionCount || 0;
+                dayData.totalDurationMinutes += record.totalDurationToday || 0;
+            }
+        });
+
+        // Convert map to array and sort by date
+        const chartData = Array.from(dailyDataMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        res.status(200).json({
+            success: true,
+            message: "Attendance chart data retrieved successfully",
+            chartData
+        });
+
+    } catch (error) {
+        console.error('Error fetching attendance chart data:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     addLibrary,
     updateLibrary,
@@ -1390,5 +1474,6 @@ module.exports = {
     getLibraryUsers,
     getUserAnalytics,
     getLibraryStatistics,
-    updateUserContactInfo
+    updateUserContactInfo,
+    getLibraryAttendanceChart
 };

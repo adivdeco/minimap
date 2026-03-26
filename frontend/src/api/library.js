@@ -56,3 +56,10 @@ export const regenerateLibraryQR = async (id) => {
     const response = await axiosClient.patch(`/library/regenerate-qr/${id}`);
     return response.data;
 };
+
+export const getLibraryAttendanceChart = async (libraryId, month, year) => {
+    const response = await axiosClient.get(`/library/${libraryId}/attendance-chart`, {
+        params: { month, year }
+    });
+    return response.data;
+};

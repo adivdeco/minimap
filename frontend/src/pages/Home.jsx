@@ -21,6 +21,7 @@ import { useTheme } from '../context/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 import NoticeBoard from '../components/NoticeBoard';
+import { OwnerAttendanceChart } from '@/components/dashboard/OwnerAttendanceChart';
 
 // --- Animations ---
 const containerVariants = {
@@ -54,6 +55,7 @@ const Home = () => {
     // Data Extraction
     const activeSeat = user?.studentDetails?.assignedSeat;
     const subscription = user?.studentDetails?.currentSubscription;
+    const userRole = user?.role;
 
     // Handle both populated object and raw ID safely
     const libraryId = subscription?.libraryId?._id || subscription?.libraryId;
@@ -352,6 +354,13 @@ const Home = () => {
                             </div>
                         </motion.div>
                     )}
+
+                    {/* Attendance Calendar */}
+                    {
+                        userRole === "library_owner" && (
+                            <OwnerAttendanceChart libraryId={libraryId} />
+                        )
+                    }
 
                     {/* --- QUICK ACTIONS --- */}
                     <QuickActionsGrid
