@@ -1485,46 +1485,46 @@ const getLibraryShiftAnalytics = async (req, res) => {
             });
         }
 
-        const Attendance = require('../models/Attendance');
-
-        // The shift chart organicly determines its dates from Local Time in frontend
-        const [yearStr, monthStr, dayStr] = date.split('-');
-        const targetStartDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
-        targetStartDate.setHours(0, 0, 0, 0);
+        // Because production servers map dates differently via timezone logic, we widen the 
+        // boundary to safely cover any UTC drifts (+/- 24 hours), then strictly filter in memory.
+        const [yStr, mStr, dStr] = date.split('-');
+        const baseDate = new Date(Date.UTC(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr)));
         
-        const targetEndDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
-        targetEndDate.setHours(23, 59, 59, 999);
+        const targetStartDate = new Date(baseDate.getTime() - (24 * 60 * 60 * 1000));
+        const targetEndDate = new Date(baseDate.getTime() + (48 * 60 * 60 * 1000));
 
-        // Fetch attendance records for this library for exactly this date bucket
+        // Fetch attendance records for this library surrounding this date bucket
         const attendanceRecords = await Attendance.find({
             libraryId,
             date: { $gte: targetStartDate, $lte: targetEndDate }
         });
 
         const shiftCounts = {
-            Morning: 0,   // 6:00 to 10:59
-            Afternoon: 0, // 11:00 to 15:59
-            Evening: 0,   // 16:00 to 20:59
-            Night: 0      // 21:00 to 5:59
+            Morning: 0,   
+            Afternoon: 0, 
+            Evening: 0,   
+            Night: 0      
         };
 
-        // Categorize sessions - 1 user = 1 count in their FIRST shift of the day
+        // Categorize sessions explicitly extracting India Local Time
         attendanceRecords.forEach(record => {
             if (record.sessions && record.sessions.length > 0) {
-                // Determine their primary shift by their first check-in time of the day
                 const firstSession = record.sessions.find(session => session.checkInTime);
                 if (firstSession) {
                     const checkInDate = new Date(firstSession.checkInTime);
-                    const hour = checkInDate.getHours();
+                    
+                    // Force the check to match Indian local time explicitly
+                    const formatterDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+                    const formatterHour = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false });
+                    
+                    const sessionLocalStr = formatterDate.format(checkInDate); // YYYY-MM-DD
+                    const hour = parseInt(formatterHour.format(checkInDate));  // 0 - 23
 
-                    if (hour >= 6 && hour < 11) {
-                        shiftCounts.Morning++;
-                    } else if (hour >= 11 && hour < 16) {
-                        shiftCounts.Afternoon++;
-                    } else if (hour >= 16 && hour < 21) {
-                        shiftCounts.Evening++;
-                    } else {
-                        shiftCounts.Night++;
+                    if (sessionLocalStr === date) {
+                        if (hour >= 6 && hour < 11) shiftCounts.Morning++;
+                        else if (hour >= 11 && hour < 16) shiftCounts.Afternoon++;
+                        else if (hour >= 16 && hour < 21) shiftCounts.Evening++;
+                        else shiftCounts.Night++;
                     }
                 }
             }
