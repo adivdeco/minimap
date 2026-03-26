@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AttendanceCalendar from '../components/AttendanceCalendar';
 import NoticeBoard from '../components/NoticeBoard';
 import { OwnerAttendanceChart } from '@/components/dashboard/OwnerAttendanceChart';
+import { OwnerShiftChart } from '@/components/dashboard/OwnerShiftChart';
 
 // --- Animations ---
 const containerVariants = {
@@ -355,10 +356,19 @@ const Home = () => {
                         </motion.div>
                     )}
 
-                    {/* Attendance Calendar */}
+                    {/* Attendance Dashboards for Owner */}
                     {
                         userRole === "library_owner" && (
-                            <OwnerAttendanceChart libraryId={libraryId} />
+                            <div className="">
+                                <OwnerAttendanceChart libraryId={libraryId} />
+                            </div>
+                        )
+                    }
+                    {
+                        userRole === "library_owner" && (
+                            <div className="mt-3 mb-3">
+                                <OwnerShiftChart libraryId={libraryId} />
+                            </div>
                         )
                     }
 

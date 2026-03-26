@@ -63,3 +63,10 @@ export const getLibraryAttendanceChart = async (libraryId, month, year) => {
     });
     return response.data;
 };
+
+export const getLibraryShiftAnalytics = async (libraryId, date) => {
+    const response = await axiosClient.get(`/library/${libraryId}/attendance-shifts`, {
+        params: { date }
+    });
+    return response.data;
+};

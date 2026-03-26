@@ -1434,7 +1434,8 @@ const getLibraryAttendanceChart = async (req, res) => {
             const dateStr = new Date(record.date).toISOString().split('T')[0];
             if (dailyDataMap.has(dateStr)) {
                 const dayData = dailyDataMap.get(dateStr);
-                dayData.totalSessions += record.sessionCount || 0;
+                // 1 Record = 1 Unique User per Day (due to compound index on Attendance)
+                dayData.totalSessions += 1; 
                 dayData.totalDurationMinutes += record.totalDurationToday || 0;
             }
         });
@@ -1450,6 +1451,98 @@ const getLibraryAttendanceChart = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching attendance chart data:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get shift attendance analytics for a specific day
+// @route   GET /api/library/:libraryId/attendance-shifts
+const getLibraryShiftAnalytics = async (req, res) => {
+    try {
+        const userId = req.finduser._id;
+        const role = req.finduser.role;
+        const { libraryId } = req.params;
+        const { date } = req.query; // YYYY-MM-DD format
+
+        // Basic validation
+        if (!date) {
+            return res.status(400).json({ message: "Date query parameter is required (YYYY-MM-DD)" });
+        }
+
+        const library = await Library.findById(libraryId);
+        if (!library) {
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        const isOwner = library.ownerId.toString() === userId.toString();
+        if (role !== 'admin' && role !== 'co-admin' && !isOwner) {
+            return res.status(403).json({
+                message: "Forbidden: You do not have access to library statistics"
+            });
+        }
+
+        const Attendance = require('../models/Attendance');
+
+        // Parse requested date
+        const targetDate = new Date(date);
+        targetDate.setHours(0, 0, 0, 0);
+
+        // Fetch attendance records for this library for exactly this date bucket
+        const attendanceRecords = await Attendance.find({
+            libraryId,
+            date: targetDate
+        });
+
+        const shiftCounts = {
+            Morning: 0,   // 6:00 to 10:59
+            Afternoon: 0, // 11:00 to 15:59
+            Evening: 0,   // 16:00 to 20:59
+            Night: 0      // 21:00 to 5:59
+        };
+
+        // Categorize sessions - 1 user = 1 count in their FIRST shift of the day
+        attendanceRecords.forEach(record => {
+            if (record.sessions && record.sessions.length > 0) {
+                // Determine their primary shift by their first check-in time of the day
+                const firstSession = record.sessions.find(session => session.checkInTime);
+                if (firstSession) {
+                    const checkInDate = new Date(firstSession.checkInTime);
+                    const hour = checkInDate.getHours();
+
+                    if (hour >= 6 && hour < 11) {
+                        shiftCounts.Morning++;
+                    } else if (hour >= 11 && hour < 16) {
+                        shiftCounts.Afternoon++;
+                    } else if (hour >= 16 && hour < 21) {
+                        shiftCounts.Evening++;
+                    } else {
+                        shiftCounts.Night++;
+                    }
+                }
+            }
+        });
+
+        // Format for recharts
+        const chartData = [
+            { shift: "Morning (6 AM - 11 AM)", visitors: shiftCounts.Morning },
+            { shift: "(11-4PM)", visitors: shiftCounts.Afternoon },
+            { shift: "Evening (4 PM - 9 PM)", visitors: shiftCounts.Evening },
+            { shift: "(9-6AM)", visitors: shiftCounts.Night }
+        ];
+
+        res.status(200).json({
+            success: true,
+            message: "Shift analytics retrieved successfully",
+            chartData,
+            totalVisitors: shiftCounts.Morning + shiftCounts.Afternoon + shiftCounts.Evening + shiftCounts.Night
+        });
+
+    } catch (error) {
+        console.error('Error fetching shift analytics:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -1475,5 +1568,6 @@ module.exports = {
     getUserAnalytics,
     getLibraryStatistics,
     updateUserContactInfo,
-    getLibraryAttendanceChart
+    getLibraryAttendanceChart,
+    getLibraryShiftAnalytics
 };

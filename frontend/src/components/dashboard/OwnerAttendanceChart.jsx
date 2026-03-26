@@ -112,32 +112,32 @@ export function OwnerAttendanceChart({ libraryId }) {
   }
 
   return (
-    <Card className="py-0 border-slate-200 dark:border-white/[0.05] rounded-[2rem] shadow-xl shadow-slate-200/50 dark:shadow-none overflow-hidden group transition-all">
+    <Card className="py-0 border-slate-200 dark:border-white/[0.05]  shadow-xl shadow-slate-200/50 dark:shadow-none overflow-hidden group transition-all">
       <CardHeader className="flex flex-col items-stretch border-b border-slate-100 dark:border-white/5 p-0 sm:flex-row">
-        <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:py-0">
+        <div className="flex flex-1 flex-col justify-center gap-1 px-4 pt-4 pb-0 sm:px-6 sm:py-0">
           <div className="flex justify-between items-center w-full">
             <div>
-              <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">Daily Visitors</CardTitle>
-              <CardDescription className="text-slate-500 dark:text-slate-400">
+              <CardTitle className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">Visitors</CardTitle>
+              <CardDescription className="hidden sm:block text-slate-500 dark:text-slate-400">
                 Number of people visiting per day
               </CardDescription>
             </div>
             
-            <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 rounded-full p-1 mt-2 sm:mt-0">
+            <div className="flex items-center space-x-1 sm:space-x-2 bg-slate-100 dark:bg-slate-800 rounded-full p-1 mt-0">
               <button 
                 onClick={handlePrevMonth}
-                className="p-1.5 rounded-full hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                className="p-1 sm:p-1.5 rounded-full hover:bg-white dark:hover:bg-slate-700 transition-colors"
                 aria-label="Previous Month"
               >
                 <ChevronLeft className="w-4 h-4 text-slate-600 dark:text-slate-300" />
               </button>
-              <span className="text-sm font-medium w-28 text-center text-slate-700 dark:text-slate-200">
-                {monthName}
+              <span className="text-[11px] sm:text-sm font-medium w-16 sm:w-28 text-center text-slate-700 dark:text-slate-200 uppercase sm:capitalize">
+                {new Date(currentYear, currentMonth - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" })}
               </span>
               <button 
                 onClick={handleNextMonth}
                 disabled={isFutureMonth}
-                className={`p-1.5 rounded-full transition-colors ${isFutureMonth ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white dark:hover:bg-slate-700'}`}
+                className={`p-1 sm:p-1.5 rounded-full transition-colors ${isFutureMonth ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white dark:hover:bg-slate-700'}`}
                 aria-label="Next Month"
               >
                 <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-300" />
@@ -146,16 +146,17 @@ export function OwnerAttendanceChart({ libraryId }) {
           </div>
         </div>
         <div className="flex">
-          <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t border-slate-100 dark:border-white/5 px-6 py-4 text-left sm:border-t-0 sm:border-l sm:px-8 sm:py-6">
-            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
-              Total Visitors
+          <div className="relative z-30 flex flex-1 items-center justify-between sm:justify-center sm:flex-col gap-1 border-t border-slate-100 dark:border-white/5 px-4 py-1 sm:px-8 sm:py-6 sm:border-t-0 sm:border-l">
+            <span className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+              Total Focus
             </span>
-            <span className="text-lg leading-none font-bold sm:text-3xl text-indigo-500 dark:text-indigo-400">
+            <span className="text-xl sm:text-3xl leading-none font-bold text-indigo-500 dark:text-indigo-400">
               {loading ? "..." : totalSessions}
             </span>
           </div>
         </div>
       </CardHeader>
+
       <CardContent className="px-2 sm:p-6 bg-slate-50/50 dark:bg-black/20">
         {loading ? (
              <div className="h-[250px] w-full flex items-center justify-center">
@@ -175,9 +176,9 @@ export function OwnerAttendanceChart({ libraryId }) {
                     accessibilityLayer
                     data={chartData}
                     margin={{
-                    left: 12,
+                    left: -30,
                     right: 12,
-                    top: 12,
+                    top: 7,
                     bottom: 12,
                     }}
                 >
