@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { checkIn, checkOut, autoReleaseSeats, activateTrial, getAttendanceHistory, activateSubscriptionOffline, grantGracePeriod } = require('../controllers/entryController');
+const { checkIn, checkOut, autoReleaseSeats, activateTrial, getAttendanceHistory, activateSubscriptionOffline, grantGracePeriod, deleteSubscription } = require('../controllers/entryController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 // @route   POST /api/entry/check-in
@@ -37,5 +37,10 @@ router.get('/history', authMiddleware, getAttendanceHistory);
 // @desc    Admin/Owner grants grace period to an expired subscription
 // @access  Private (Admin or Library Owner)
 router.post('/grant-grace-period/:libraryId/:subscriptionId', authMiddleware, grantGracePeriod);
+
+// @route   DELETE /api/entry/subscription/:libraryId/:subscriptionId
+// @desc    Admin/Owner cancels/deletes an active subscription
+// @access  Private (Admin or Library Owner)
+router.delete('/subscription/:libraryId/:subscriptionId', authMiddleware, deleteSubscription);
 
 module.exports = router;

@@ -28,13 +28,14 @@ export const getAttendanceHistory = async () => {
 };
 
 // Activate Subscription Offline (Admin/Owner only)
-export const activateSubscriptionOffline = async (userId, libraryId, planId, pricePaid = 0, startDate = null) => {
+export const activateSubscriptionOffline = async (userId, libraryId, planId, pricePaid = 0, startDate = null, endDate = null) => {
     const response = await api.post('/entry/activate-subscription-offline', {
         userId,
         libraryId,
         planId,
         pricePaid,
-        startDate
+        startDate,
+        endDate
     });
     return response.data;
 };
@@ -44,6 +45,12 @@ export const grantGracePeriod = async (libraryId, subscriptionId, graceDays) => 
     const response = await api.post(`/entry/grant-grace-period/${libraryId}/${subscriptionId}`, {
         graceDays
     });
+    return response.data;
+};
+
+// Delete/Cancel Subscription (Admin/Owner only)
+export const deleteSubscription = async (libraryId, subscriptionId) => {
+    const response = await api.delete(`/entry/subscription/${libraryId}/${subscriptionId}`);
     return response.data;
 };
 

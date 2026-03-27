@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { activateSubscriptionOffline, grantGracePeriod } from '../api/entry';
+import { activateSubscriptionOffline, grantGracePeriod, deleteSubscription } from '../api/entry';
 import { getLibraryPlans } from '../api/plan';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
-import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X, Gift } from 'lucide-react';
+import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X, Gift, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const UserSubscriptionManagement = ({ libraryId }) => {
@@ -19,10 +19,12 @@ const UserSubscriptionManagement = ({ libraryId }) => {
     const [showModal, setShowModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [activatingId, setActivatingId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
     const [subscriptionForm, setSubscriptionForm] = useState({
         planId: '',
         pricePaid: '',
         startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
         paymentMethod: 'cash'
     });
 
@@ -40,15 +42,23 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         }
     }, [libraryId, canManageSubscriptions]);
 
-    // Auto-fill price when a plan is selected
+    // Auto-fill price and end date when a plan is selected
     useEffect(() => {
         if (subscriptionForm.planId && plans.length > 0) {
             const selectedPlan = plans.find(p => p._id === subscriptionForm.planId);
             if (selectedPlan) {
-                setSubscriptionForm(prev => ({ ...prev, pricePaid: selectedPlan.price }));
+                const start = subscriptionForm.startDate ? new Date(subscriptionForm.startDate) : new Date();
+                const end = new Date(start);
+                end.setDate(end.getDate() + (selectedPlan.durationInDays || 0));
+                
+                setSubscriptionForm(prev => ({ 
+                    ...prev, 
+                    pricePaid: selectedPlan.price,
+                    endDate: end.toISOString().split('T')[0]
+                }));
             }
         }
-    }, [subscriptionForm.planId, plans]);
+    }, [subscriptionForm.planId, plans, subscriptionForm.startDate]);
 
     const fetchLibraryUsers = async () => {
         try {
@@ -101,6 +111,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
             planId: '',
             pricePaid: '',
             startDate: new Date().toISOString().split('T')[0],
+            endDate: '',
             paymentMethod: 'cash'
         });
         setShowModal(true);
@@ -123,7 +134,8 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                 libraryId,
                 subscriptionForm.planId,
                 parseFloat(subscriptionForm.pricePaid),
-                subscriptionForm.startDate
+                subscriptionForm.startDate,
+                subscriptionForm.endDate
             );
 
             if (response.success) {
@@ -170,6 +182,28 @@ const UserSubscriptionManagement = ({ libraryId }) => {
             toast.error(error.response?.data?.msg || "Failed to grant grace period");
         } finally {
             setGrantingGraceId(null);
+        }
+    };
+
+    const handleDeleteSubscription = async (userId, subscriptionId, userName) => {
+        if (!window.confirm(`Are you sure you want to cancel ${userName}'s active subscription? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            setDeletingId(userId);
+            const response = await deleteSubscription(libraryId, subscriptionId);
+            
+            if (response.success) {
+                toast.success(response.msg || "Subscription canceled successfully");
+                fetchLibraryUsers();
+            } else {
+                toast.error(response.msg || "Failed to cancel subscription");
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.msg || "Failed to cancel subscription");
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -304,7 +338,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                                         {subscription?.subscriptionId && (
                                                             <button
                                                                 onClick={() => openGraceModal(user)}
-                                                                disabled={grantingGraceId === user._id || activatingId === user._id}
+                                                                disabled={grantingGraceId === user._id || activatingId === user._id || deletingId === user._id}
                                                                 title={subscription?.gracePeriodAllowed ? "Update Grace Period" : "Grant Grace Period"}
                                                                 className="inline-flex items-center justify-center p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-200 dark:hover:bg-purple-800/50 disabled:opacity-50 transition-colors shadow-sm"
                                                             >
@@ -313,14 +347,24 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                                         )}
                                                         <button
                                                             onClick={() => openActivationModal(user)}
-                                                            disabled={activatingId === user._id || grantingGraceId === user._id}
+                                                            disabled={activatingId === user._id || grantingGraceId === user._id || deletingId === user._id}
                                                             className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
                                                         >
                                                             <Plus size={14} /> {activatingId === user._id ? 'Processing...' : 'Assign Plan'}
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-sm font-medium text-gray-400 dark:text-gray-500 mr-4">Up to date</span>
+                                                    <div className="flex items-center justify-end gap-3 mr-4">
+                                                        <span className="text-sm font-medium text-gray-400 dark:text-gray-500">Up to date</span>
+                                                        <button 
+                                                            onClick={() => handleDeleteSubscription(user._id, subscription.subscriptionId, user.name)}
+                                                            disabled={deletingId === user._id}
+                                                            title="Cancel Subscription"
+                                                            className="inline-flex items-center justify-center p-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-500/20 disabled:opacity-50 transition-colors shadow-sm"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -402,19 +446,35 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Payment Method</label>
-                                    <select
-                                        name="paymentMethod"
-                                        value={subscriptionForm.paymentMethod}
-                                        onChange={handleFormChange}
-                                        className="w-full px-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white appearance-none"
-                                    >
-                                        <option value="cash">Cash</option>
-                                        <option value="upi">UPI/QR Code</option>
-                                        <option value="bank_transfer">Bank Transfer</option>
-                                        <option value="other">Other</option>
-                                    </select>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">End Date *</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="date"
+                                                name="endDate"
+                                                value={subscriptionForm.endDate || ''}
+                                                onChange={handleFormChange}
+                                                className="w-full pl-9 pr-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Payment Method</label>
+                                        <select
+                                            name="paymentMethod"
+                                            value={subscriptionForm.paymentMethod}
+                                            onChange={handleFormChange}
+                                            className="w-full px-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white appearance-none"
+                                        >
+                                            <option value="cash">Cash</option>
+                                            <option value="upi">UPI/QR Code</option>
+                                            <option value="bank_transfer">Bank Transfer</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div className="flex gap-3 pt-4">

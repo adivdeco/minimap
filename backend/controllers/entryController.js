@@ -555,7 +555,7 @@ exports.activateSubscriptionOffline = async (req, res) => {
     session.startTransaction();
 
     try {
-        const { userId, libraryId, planId, pricePaid, startDate } = req.body;
+        const { userId, libraryId, planId, pricePaid, startDate, endDate } = req.body;
         const adminId = req.finduser._id;
         const adminRole = req.finduser.role;
 
@@ -610,11 +610,16 @@ exports.activateSubscriptionOffline = async (req, res) => {
         }
 
         const subStartDate = startDate ? new Date(startDate) : new Date();
-        const expiryDate = new Date(subStartDate);
-
-        let finalDuration = plan.durationInDays - graceDaysToDeduct;
-        if (finalDuration < 1) finalDuration = 1; // Allow minimum 1 day if grace period ate up the whole plan
-        expiryDate.setDate(expiryDate.getDate() + finalDuration);
+        let expiryDate;
+        
+        if (endDate) {
+            expiryDate = new Date(endDate);
+        } else {
+            expiryDate = new Date(subStartDate);
+            let finalDuration = plan.durationInDays - graceDaysToDeduct;
+            if (finalDuration < 1) finalDuration = 1; // Allow minimum 1 day if grace period ate up the whole plan
+            expiryDate.setDate(expiryDate.getDate() + finalDuration);
+        }
 
         const [newSub] = await Subscription.create([{
             userId,
@@ -670,7 +675,71 @@ exports.activateSubscriptionOffline = async (req, res) => {
 };
 
 // ==========================================
-// 6. AUTO-RELEASE CRON JOB
+// 6. CANCEL/DELETE SUBSCRIPTION (Admin)
+// ==========================================
+exports.deleteSubscription = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { libraryId, subscriptionId } = req.params;
+        const adminId = req.finduser._id;
+        const adminRole = req.finduser.role;
+
+        const library = await Library.findById(libraryId).session(session);
+        if (!library) throw new Error("NOT_FOUND: Library not found");
+
+        const isAdmin = adminRole === 'admin' || adminRole === 'co-admin';
+        const isLibraryOwner = adminRole === 'library_owner' && library.ownerId.toString() === adminId.toString();
+
+        if (!isAdmin && !isLibraryOwner) throw new Error("FORBIDDEN: Unauthorized");
+
+        const subscription = await Subscription.findById(subscriptionId).session(session);
+        if (!subscription) throw new Error("NOT_FOUND: Subscription not found");
+        if (subscription.libraryId.toString() !== libraryId.toString()) {
+            throw new Error("BAD_REQUEST: Subscription does not belong to this library");
+        }
+
+        const userId = subscription.userId;
+
+        // Delete the subscription
+        await Subscription.findByIdAndDelete(subscriptionId).session(session);
+
+        // Update user if they are currently active with this subscription
+        const user = await User.findById(userId).session(session);
+        if (user && user.studentDetails?.currentSubscription?.subscriptionId?.toString() === subscriptionId.toString()) {
+            user.studentDetails.currentSubscription = null;
+            await user.save({ session });
+        }
+
+        // We do not cancel the seat here since this is just subscription payment removal.
+        // It will expire/check-out normally or the admin can evict them manually if needed.
+
+        await session.commitTransaction();
+
+        res.status(200).json({
+            success: true,
+            msg: "Subscription canceled successfully"
+        });
+
+    } catch (err) {
+        await session.abortTransaction();
+        console.error("Delete Sub Error:", err);
+        const code = err.message.split(':')[0];
+        const msg = err.message.split(': ')[1] || "Failed";
+
+        if (code === "BAD_REQUEST") return res.status(400).json({ success: false, msg });
+        if (code === "NOT_FOUND") return res.status(404).json({ success: false, msg });
+        if (code === "FORBIDDEN") return res.status(403).json({ success: false, msg });
+
+        res.status(500).json({ success: false, msg: "Failed to cancel subscription" });
+    } finally {
+        session.endSession();
+    }
+};
+
+// ==========================================
+// 7. AUTO-RELEASE CRON JOB
 // ==========================================
 // Keeping this outside transaction for now to avoid locking the entire DB collection
 // Individual seat releases could be transactionalized if strictness is needed.
