@@ -34,7 +34,7 @@ export function OwnerShiftChart({ libraryId }) {
   // Date state initialized to today
   const [selectedDate, setSelectedDate] = React.useState(new Date())
 
-  const formattedDateForAPI = selectedDate.toISOString().split('T')[0]
+  const formattedDateForAPI = selectedDate.toLocaleDateString('en-CA')
   const displayDate = selectedDate.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",

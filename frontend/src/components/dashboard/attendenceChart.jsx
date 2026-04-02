@@ -150,7 +150,7 @@ export function AttendanceChart() {
               cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
               content={
                 <ChartTooltipContent
-                  className="w-[150px] bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 shadow-lg"
+                  className="w-[150px] bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 shadow-lg !text-slate-900 dark:!text-white"
                   nameKey="duration"
                   labelKey="fullDate"
                 />

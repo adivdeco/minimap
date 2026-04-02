@@ -4,7 +4,7 @@ import { activateSubscriptionOffline, grantGracePeriod, deleteSubscription } fro
 import { getLibraryPlans } from '../api/plan';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
-import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X, Gift, Trash2 } from 'lucide-react';
+import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X, Gift, Trash2, Download, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const UserSubscriptionManagement = ({ libraryId }) => {
@@ -23,7 +23,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
     const [subscriptionForm, setSubscriptionForm] = useState({
         planId: '',
         pricePaid: '',
-        startDate: new Date().toISOString().split('T')[0],
+        startDate: new Date().toLocaleDateString('en-CA'),
         endDate: '',
         paymentMethod: 'cash'
     });
@@ -54,7 +54,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                 setSubscriptionForm(prev => ({ 
                     ...prev, 
                     pricePaid: selectedPlan.price,
-                    endDate: end.toISOString().split('T')[0]
+                    endDate: end.toLocaleDateString('en-CA')
                 }));
             }
         }
@@ -110,7 +110,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         setSubscriptionForm({
             planId: '',
             pricePaid: '',
-            startDate: new Date().toISOString().split('T')[0],
+            startDate: new Date().toLocaleDateString('en-CA'),
             endDate: '',
             paymentMethod: 'cash'
         });
@@ -213,6 +213,37 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         user.phone?.includes(searchTerm)
     );
 
+    const handleExportCSV = () => {
+        if (filteredUsers.length === 0) return toast.error("No data to export");
+
+        const headers = ["Name", "Email", "Phone", "Plan", "Status", "Expiry Date", "Price Paid"];
+        const rows = filteredUsers.map(user => [
+            user.name,
+            user.email,
+            user.phone || 'N/A',
+            user.studentDetails?.currentSubscription?.planName || 'N/A',
+            user.studentDetails?.currentSubscription?.status || 'No Plan',
+            user.studentDetails?.currentSubscription?.expiryDate ? new Date(user.studentDetails.currentSubscription.expiryDate).toLocaleDateString() : 'N/A',
+            user.studentDetails?.currentSubscription?.pricePaid || 0
+        ]);
+
+        const csvContent = [
+            headers.join(","),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `library_members_${libraryId}_${new Date().toLocaleDateString('en-CA')}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Members list exported to CSV");
+    };
+
     if (!canManageSubscriptions) {
         return (
             <div className="p-6 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl text-center">
@@ -233,15 +264,25 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Activate plans for members paying offline or in cash.</p>
                 </div>
 
-                <div className="relative w-full md:w-80">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search members..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm transition-all"
-                    />
+                <div className="flex items-center gap-3 w-full md:w-fit">
+                    <button 
+                        onClick={handleExportCSV}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all text-sm font-bold shadow-sm"
+                        title="Export filtered list to CSV"
+                    >
+                        <Download size={18} />
+                        <span className="hidden sm:inline">Export CSV</span>
+                    </button>
+                    <div className="relative w-full md:w-80">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search members..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm transition-all"
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -287,8 +328,11 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                         }
                                     }
 
+                                    const daysUntilExpiry = isActive ? Math.ceil((new Date(subscription.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                                    const isExpiringSoon = isActive && daysUntilExpiry !== null && daysUntilExpiry <= 3;
+
                                     return (
-                                        <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                        <tr key={user._id} className={`hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${isExpiringSoon ? 'bg-orange-50/30 dark:bg-orange-500/5' : ''}`}>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</div>
                                             </td>
@@ -301,10 +345,11 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 {isActive ? (
                                                     <div className="flex flex-col gap-1">
-                                                        <span className="px-2.5 py-1 bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1.5 w-fit border border-green-200 dark:border-green-500/20">
-                                                            <Clock size={12} /> Active
+                                                        <span className={`px-2.5 py-1 ${isExpiringSoon ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/30' : 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'} text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1.5 w-fit border`}>
+                                                            {isExpiringSoon ? <AlertCircle size={12} /> : <Clock size={12} />} 
+                                                            {isExpiringSoon ? 'Expiring Soon' : 'Active'}
                                                         </span>
-                                                        <span className="text-[11px] text-gray-500">Exp: {new Date(subscription.expiryDate).toLocaleDateString()}</span>
+                                                        <span className={`text-[11px] ${isExpiringSoon ? 'text-orange-600 dark:text-orange-400 font-bold' : 'text-gray-500'}`}>Exp: {new Date(subscription.expiryDate).toLocaleDateString()}</span>
                                                         {subscription?.graceDaysUsed > 0 && (
                                                             <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1">
                                                                 <Gift size={10} /> Used {subscription.graceDaysUsed} Grace Days

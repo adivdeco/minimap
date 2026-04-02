@@ -5,18 +5,23 @@ import Navbar from '../components/Navbar';
 import PlanManagement from '../components/PlanManagement';
 import UserSubscriptionManagement from '../components/UserSubscriptionManagement';
 import NoticeManagement from '../components/NoticeManagement';
+import AdminAnalytics from '../components/dashboard/AdminAnalytics';
+import OccupancyWidget from '../components/dashboard/OccupancyWidget';
 import { toast } from 'react-toastify';
-import { Settings, Users, DollarSign, ArrowLeft, BellRing } from 'lucide-react';
+import { Settings, Users, DollarSign, ArrowLeft, BellRing, LayoutDashboard } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 
 const LibraryAdminPanel = () => {
     const { id: libraryId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    const [activeTab, setActiveTab] = useState('subscriptions');
+    const [activeTab, setActiveTab] = useState('analytics'); // Default to analytics for insight-first view
     const [loading, setLoading] = useState(true);
+    const [statsLoading, setStatsLoading] = useState(true);
+    const [libStats, setLibStats] = useState(null);
 
     const canAccess = user?.role === 'admin' || user?.role === 'co-admin' || user?.role === 'library_owner';
 
@@ -27,7 +32,22 @@ const LibraryAdminPanel = () => {
             return;
         }
         setLoading(false);
+        fetchStats();
     }, [canAccess, navigate]);
+
+    const fetchStats = async () => {
+        setStatsLoading(true);
+        try {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL}/library/${libraryId}/statistics`, {
+                withCredentials: true
+            });
+            setLibStats(response.data);
+        } catch (error) {
+            console.error("Error fetching occupancy:", error);
+        } finally {
+            setStatsLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -43,6 +63,7 @@ const LibraryAdminPanel = () => {
     if (!canAccess) return null;
 
     const tabs = [
+        { id: 'analytics', label: 'Analytics & Insights', icon: LayoutDashboard },
         { id: 'subscriptions', label: 'User Subscriptions', icon: Users },
         { id: 'plans', label: 'Plans Management', icon: DollarSign },
         { id: 'notices', label: 'Announcements', icon: BellRing },
@@ -61,11 +82,23 @@ const LibraryAdminPanel = () => {
                     >
                         <ArrowLeft size={16} /> Back to Dashboard
                     </button>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-blue-600/10 dark:bg-blue-500/20 rounded-xl">
-                            <Settings className="text-blue-600 dark:text-blue-400" size={28} />
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-blue-600/10 dark:bg-blue-500/20 rounded-xl">
+                                <Settings className="text-blue-600 dark:text-blue-400" size={28} />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Library Admin Panel</h1>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Manage and monitor your library's performance</p>
+                            </div>
                         </div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Library Admin Panel</h1>
+
+                        {/* Real-time Occupancy Widget */}
+                        <OccupancyWidget 
+                            occupiedCount={libStats?.library?.occupiedSeats || 0} 
+                            totalCapacity={libStats?.library?.totalSeats || 0}
+                            loading={statsLoading}
+                        />
                     </div>
                 </motion.div>
 
@@ -105,6 +138,7 @@ const LibraryAdminPanel = () => {
                             exit={{ opacity: 0, y: -10 }}
                             transition={{ duration: 0.2 }}
                         >
+                            {activeTab === 'analytics' && <AdminAnalytics libraryId={libraryId} />}
                             {activeTab === 'subscriptions' && <UserSubscriptionManagement libraryId={libraryId} />}
                             {activeTab === 'plans' && <PlanManagement libraryId={libraryId} />}
                             {activeTab === 'notices' && <NoticeManagement libraryId={libraryId} />}

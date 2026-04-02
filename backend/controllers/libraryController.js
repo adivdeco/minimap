@@ -1202,12 +1202,16 @@ const getLibraryStatistics = async (req, res) => {
 
         const Subscription = require('../models/Subscription');
         const Attendance = require('../models/Attendance');
+        const Seat = require('../models/Seat');
 
         // Get all subscriptions
         const allSubscriptions = await Subscription.find({ libraryId });
 
-        // Get today's attendance
-        const today = new Date();
+        // Get real-time occupancy
+        const occupiedSeats = await Seat.countDocuments({ libraryId, status: 'Occupied' });
+
+        // Get today's attendance (Forced to Asia/Kolkata for consistency)
+        const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
         today.setHours(0, 0, 0, 0);
 
         const todayAttendance = await Attendance.find({
@@ -1262,6 +1266,7 @@ const getLibraryStatistics = async (req, res) => {
                 _id: library._id,
                 name: library.libraryName,
                 totalSeats: library.totalSeats,
+                occupiedSeats,
                 rating: avgRating,
                 totalReviews
             },
@@ -1513,17 +1518,14 @@ const getLibraryShiftAnalytics = async (req, res) => {
                 if (firstSession) {
                     const checkInDate = new Date(firstSession.checkInTime);
                     
-                    // Force the check to match Indian local time explicitly
-                    const formatterDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-                    const formatterHour = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false });
-                    
-                    const sessionLocalStr = formatterDate.format(checkInDate); // YYYY-MM-DD
-                    const hour = parseInt(formatterHour.format(checkInDate));  // 0 - 23
+                    const sessionLocalStr = checkInDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    const hour = checkInDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric' });
+                    const currentHour = parseInt(hour);
 
                     if (sessionLocalStr === date) {
-                        if (hour >= 6 && hour < 11) shiftCounts.Morning++;
-                        else if (hour >= 11 && hour < 16) shiftCounts.Afternoon++;
-                        else if (hour >= 16 && hour < 21) shiftCounts.Evening++;
+                        if (currentHour >= 6 && currentHour < 11) shiftCounts.Morning++;
+                        else if (currentHour >= 11 && currentHour < 16) shiftCounts.Afternoon++;
+                        else if (currentHour >= 16 && currentHour < 21) shiftCounts.Evening++;
                         else shiftCounts.Night++;
                     }
                 }
