@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
@@ -11,8 +11,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useQuery } from '@tanstack/react-query';
 import {
-    Library, CalendarDays, Sun, Moon, X, ChevronRight, Users, Bell, Sparkles,
-    MapPin, ScanLine, ShieldCheck, ArrowUpRight, Clock3, LogOut
+    Library, CalendarDays, Sun, Moon, X, ChevronRight, Users, Bell
 } from 'lucide-react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import ActiveSessionCard from '../components/dashboard/ActiveSessionCard';
@@ -82,27 +81,6 @@ const Home = () => {
 
     const hasSubscription = !!subscription && subscription.status === 'active';
     const isAdmin = user?.role === 'admin' || user?.role === 'co-admin';
-    const firstName = user?.name?.split(' ')[0] || 'Reader';
-    const userInitial = user?.name?.charAt(0)?.toUpperCase() || 'R';
-    const activeSeatLabel = activeSeat?.seatNumber || activeSeat?.seatId || 'Not assigned';
-    const membershipTone = hasSubscription ? 'Active membership' : 'Explore plans';
-    const heroStats = [
-        {
-            label: 'Seat',
-            value: hasSubscription ? activeSeatLabel : 'Open',
-            icon: <Library size={16} className="text-amber-300" />
-        },
-        {
-            label: 'Days left',
-            value: hasSubscription ? `${daysLeft}` : '--',
-            icon: <Clock3 size={16} className="text-cyan-300" />
-        },
-        {
-            label: 'Unread notices',
-            value: `${unreadNoticesCount}`,
-            icon: <Bell size={16} className="text-pink-300" />
-        }
-    ];
 
     // --- Effects & Queries ---
 
@@ -169,17 +147,16 @@ const Home = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.18),_transparent_28%),radial-gradient(circle_at_85%_15%,_rgba(14,165,233,0.16),_transparent_24%),linear-gradient(180deg,_#fff8ef_0%,_#f8fafc_42%,_#eef2ff_100%)] dark:bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.18),_transparent_22%),radial-gradient(circle_at_85%_15%,_rgba(56,189,248,0.16),_transparent_20%),linear-gradient(180deg,_#04070d_0%,_#07111f_48%,_#02040a_100%)] text-gray-900 dark:text-white selection:bg-orange-500/20 transition-colors duration-300">
+        <div className="min-h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white selection:bg-purple-500/30 transition-colors duration-300">
 
             {/* Ambient Background Glows */}
             <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-200/45 dark:bg-orange-500/10 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-200/45 dark:bg-cyan-500/10 rounded-full blur-[120px]" />
-                <div className="absolute top-[25%] right-[30%] w-[320px] h-[320px] bg-fuchsia-200/25 dark:bg-fuchsia-500/10 rounded-full blur-[120px]" />
+                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-200/40 dark:bg-purple-900/20 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/40 dark:bg-indigo-900/10 rounded-full blur-[120px]" />
             </div>
 
             {/* Navigation */}
-            <nav className="sticky top-0 z-40 backdrop-blur-xl bg-white/55 dark:bg-slate-950/50 border-b border-white/40 dark:border-white/8 shadow-[0_20px_80px_-50px_rgba(15,23,42,0.55)] transition-colors duration-300">
+            <nav className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 dark:bg-black/40 border-b border-gray-200 dark:border-white/5 transition-colors duration-300">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         {/* Logo */}
@@ -189,19 +166,12 @@ const Home = () => {
                             className="flex items-center gap-3 cursor-pointer"
                             onClick={() => navigate('/')}
                         >
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/40 bg-white/70 shadow-lg shadow-orange-200/40 dark:border-white/10 dark:bg-white/6 dark:shadow-orange-500/10">
-                                    <Library size={20} className="text-orange-500 dark:text-orange-300" />
-                                </div>
-                                <div>
-                                    <span className="block text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                                        Study<span className="text-orange-500 dark:text-cyan-300">Space</span>
-                                    </span>
-                                    <span className="block text-[11px] uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
-                                        Smart library hub
-                                    </span>
-                                </div>
-                            </div>
+                            {/* <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                <Library className="text-white" size={20} />
+                            </div> */}
+                            <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Study<span className="text-purple-600 dark:text-purple-400">Space</span>
+                            </span>
                         </motion.div>
 
                         {/* Desktop Menu */}
@@ -213,7 +183,7 @@ const Home = () => {
                             {/* Theme Toggle */}
                             <button
                                 onClick={toggleTheme}
-                                className="p-2 ml-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-white/80 dark:hover:bg-white/8 transition-all"
+                                className="p-2 ml-2 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all"
                             >
                                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                             </button>
@@ -222,7 +192,7 @@ const Home = () => {
                             {libraryId && (
                                 <button
                                     onClick={() => setShowNotices(true)}
-                                    className="p-2 ml-1 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-white/80 dark:hover:bg-white/8 transition-all relative"
+                                    className="p-2 ml-1 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all relative"
                                     title="Notices"
                                 >
                                     <Bell size={18} />
@@ -244,41 +214,32 @@ const Home = () => {
                                 {hasSubscription && (
                                     <button
                                         onClick={() => setShowAttendance(true)}
-                                        className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/10 hover:border-orange-400/40 dark:hover:border-cyan-300/30 hover:bg-white/80 dark:hover:bg-white/10 transition-all group shadow-sm"
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all group"
                                     >
-                                        <CalendarDays size={16} className="text-orange-500 dark:text-cyan-300" />
-                                        <span className="text-sm font-medium text-slate-600 dark:text-slate-200">Attendance</span>
+                                        <CalendarDays size={16} className="text-purple-400" />
+                                        <span className="text-sm font-medium text-gray-500">Attendance</span>
                                     </button>
                                 )}
 
                                 <button
                                     onClick={() => navigate('/profile')}
-                                    className="flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-white/65 dark:bg-white/5 border border-white/60 dark:border-white/10 hover:border-orange-400/40 dark:hover:border-cyan-300/30 hover:bg-white/80 dark:hover:bg-white/10 transition-all cursor-pointer group shadow-sm"
+                                    className="flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer group"
                                 >
                                     {user?.avatar ? (
-                                        <img src={user.avatar} alt="Profile" referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover border-2 border-orange-400/40 group-hover:border-orange-400 dark:border-cyan-300/40 dark:group-hover:border-cyan-300" />
+                                        <img src={user.avatar} alt="Profile" referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
                                     ) : (
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-cyan-500 flex items-center justify-center text-xs font-bold shadow-inner text-white">
-                                            {userInitial}
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold shadow-inner text-white">
+                                            {user?.name?.charAt(0)?.toUpperCase()}
                                         </div>
                                     )}
                                     <div className="flex flex-col items-start leading-none gap-1">
-                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors">
-                                            {firstName}
+                                        <span className="text-sm font-medium text-gray-500 group-hover:text-200 transition-colors">
+                                            {user?.name?.split(' ')[0]}
                                         </span>
-                                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold dark:text-slate-400">
+                                        <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
                                             {user?.role === 'student' ? 'Member' : user?.role}
                                         </span>
                                     </div>
-                                </button>
-                                <button
-                                    onClick={handleLogout}
-                                    className="rounded-2xl border border-white/50 bg-white/65 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <LogOut size={16} />
-                                        Logout
-                                    </span>
                                 </button>
                             </div>
 
@@ -286,7 +247,7 @@ const Home = () => {
                             <div className="md:hidden flex items-center gap-3">
                                 <button
                                     onClick={toggleTheme}
-                                    className="p-2.5 rounded-full bg-white/70 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-orange-500 dark:hover:text-cyan-300 transition-all shadow-sm"
+                                    className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all"
                                 >
                                     {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                                 </button>
@@ -294,7 +255,7 @@ const Home = () => {
                                 {libraryId && (
                                     <button
                                         onClick={() => setShowNotices(true)}
-                                        className="p-2.5 rounded-full bg-white/70 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-orange-500 dark:hover:text-cyan-300 hover:bg-white dark:hover:bg-white/10 transition-all relative shadow-sm"
+                                        className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all relative"
                                     >
                                         <Bell size={18} />
                                         {unreadNoticesCount > 0 && (
@@ -306,7 +267,7 @@ const Home = () => {
                                 {hasSubscription && (
                                     <button
                                         onClick={() => setShowAttendance(true)}
-                                        className="p-2.5 rounded-full bg-white/70 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-orange-500 dark:hover:text-cyan-300 hover:bg-white dark:hover:bg-white/10 transition-all shadow-sm"
+                                        className="p-2.5 rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all"
                                         title="Attendance"
                                     >
                                         <CalendarDays size={18} />
@@ -314,13 +275,13 @@ const Home = () => {
                                 )}
                                 <button
                                     onClick={() => navigate('/profile')}
-                                    className="flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-white/70 dark:bg-white/5 border border-white/50 dark:border-white/10 hover:border-orange-400/40 dark:hover:border-cyan-300/30 hover:bg-white dark:hover:bg-white/10 transition-all cursor-pointer group shadow-sm"
+                                    className="flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/30 hover:bg-white/10 transition-all cursor-pointer group"
                                 >
                                     {user?.avatar ? (
-                                        <img src={user.avatar} alt="Profile" referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover border-2 border-orange-400/40 group-hover:border-orange-400 dark:border-cyan-300/40 dark:group-hover:border-cyan-300" />
+                                        <img src={user.avatar} alt="Profile" referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400" />
                                     ) : (
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-cyan-500 flex items-center justify-center text-xs font-bold shadow-inner text-white">
-                                            {userInitial}
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-bold shadow-inner text-white">
+                                            {user?.name?.charAt(0)?.toUpperCase()}
                                         </div>
                                     )}
 
@@ -340,127 +301,6 @@ const Home = () => {
                 >
                     {/* Header */}
                     <DashboardHeader user={user} />
-
-                    <motion.section
-                        variants={itemVariants}
-                        className="mb-10 grid gap-6 xl:grid-cols-[1.6fr_1fr]"
-                    >
-                        <div className="relative overflow-hidden rounded-[32px] border border-white/55 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,247,237,0.88)_45%,rgba(224,242,254,0.82)_100%)] p-6 shadow-[0_30px_100px_-45px_rgba(14,165,233,0.45)] dark:border-white/10 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(30,41,59,0.84)_45%,rgba(8,47,73,0.78)_100%)]">
-                            <div className="absolute -right-12 top-0 h-40 w-40 rounded-full bg-orange-300/30 blur-3xl dark:bg-orange-400/10" />
-                            <div className="absolute bottom-0 right-20 h-44 w-44 rounded-full bg-cyan-300/30 blur-3xl dark:bg-cyan-400/10" />
-                            <div className="relative z-10">
-                                <div className="mb-5 flex flex-wrap items-center gap-3">
-                                    <span className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/75 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-700 dark:border-white/10 dark:bg-white/8 dark:text-slate-200">
-                                        <Sparkles size={14} className="text-orange-500 dark:text-cyan-300" />
-                                        {membershipTone}
-                                    </span>
-                                    {libraryName && (
-                                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white dark:border-white/10 dark:bg-white/10">
-                                            <ShieldCheck size={14} className="text-emerald-300" />
-                                            {libraryName}
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="max-w-3xl">
-                                    <h2 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-                                        Your study dashboard now feels like a real command center.
-                                    </h2>
-                                    <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base dark:text-slate-300">
-                                        Track your seat, scan in fast, watch subscription progress, and stay on top of notices from one sharper-looking home screen.
-                                    </p>
-                                </div>
-
-                                <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                                    {heroStats.map((stat) => (
-                                        <div
-                                            key={stat.label}
-                                            className="rounded-3xl border border-white/70 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/7"
-                                        >
-                                            <div className="mb-4 flex items-center justify-between">
-                                                <span className="text-xs uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">{stat.label}</span>
-                                                <span className="rounded-full bg-slate-900/90 p-2 dark:bg-white/10">{stat.icon}</span>
-                                            </div>
-                                            <div className="text-2xl font-semibold text-slate-900 dark:text-white">{stat.value}</div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-8 flex flex-wrap gap-3">
-                                    <button
-                                        onClick={() => hasSubscription ? setShowScanner(true) : navigate('/libraries')}
-                                        className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                                    >
-                                        <ScanLine size={18} />
-                                        {hasSubscription ? 'Open scanner' : 'Browse libraries'}
-                                    </button>
-                                    <button
-                                        onClick={() => libraryId ? setShowNotices(true) : navigate('/libraries')}
-                                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-300/80 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-700 transition-all hover:-translate-y-0.5 hover:border-slate-400 hover:bg-white dark:border-white/10 dark:bg-white/6 dark:text-slate-100 dark:hover:bg-white/10"
-                                    >
-                                        <Bell size={18} />
-                                        Check notices
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-4">
-                            <div className="rounded-[28px] border border-white/55 bg-white/75 p-5 shadow-[0_24px_80px_-48px_rgba(249,115,22,0.55)] backdrop-blur dark:border-white/10 dark:bg-white/6">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Current setup</p>
-                                        <h3 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                                            {planName || 'No plan yet'}
-                                        </h3>
-                                    </div>
-                                    <div className="rounded-2xl bg-orange-500/10 p-3 text-orange-500 dark:bg-cyan-400/10 dark:text-cyan-300">
-                                        <ArrowUpRight size={18} />
-                                    </div>
-                                </div>
-                                <div className="mt-6 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                                    <div className="flex items-center justify-between rounded-2xl bg-slate-950/[0.03] px-4 py-3 dark:bg-white/5">
-                                        <span>Subscription</span>
-                                        <span className="font-semibold text-slate-900 dark:text-white">{hasSubscription ? 'Active' : 'Inactive'}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between rounded-2xl bg-slate-950/[0.03] px-4 py-3 dark:bg-white/5">
-                                        <span>Seat access</span>
-                                        <span className="font-semibold text-slate-900 dark:text-white">{activeSeatLabel}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between rounded-2xl bg-slate-950/[0.03] px-4 py-3 dark:bg-white/5">
-                                        <span>Amount paid</span>
-                                        <span className="font-semibold text-slate-900 dark:text-white">{pricePaid ? `Rs ${pricePaid}` : '--'}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="rounded-[28px] border border-slate-200/80 bg-slate-950 p-5 text-white shadow-[0_24px_80px_-48px_rgba(2,132,199,0.75)] dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(8,47,73,0.92))]">
-                                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Library pulse</p>
-                                <div className="mt-4 space-y-4">
-                                    <div>
-                                        <p className="text-2xl font-semibold">{libraryName || 'Choose a library'}</p>
-                                        <p className="mt-2 flex items-start gap-2 text-sm text-slate-300">
-                                            <MapPin size={16} className="mt-0.5 shrink-0 text-cyan-300" />
-                                            <span>{libraryAddress || 'Pick a library to unlock notices, seat maps, and check-in tools.'}</span>
-                                        </p>
-                                    </div>
-                                    <div className="rounded-3xl border border-white/10 bg-white/6 p-4">
-                                        <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.24em] text-slate-400">
-                                            <span>Role</span>
-                                            <span>{user?.role === 'student' ? 'Member' : user?.role}</span>
-                                        </div>
-                                        <p className="text-sm leading-6 text-slate-300">
-                                            {isAdmin
-                                                ? 'You have elevated controls. Review users, notices, and branch-wide activity from this home base.'
-                                                : hasSubscription
-                                                    ? 'Your next session is one tap away. Use the scanner, review attendance, and keep an eye on updates.'
-                                                    : 'You are ready to explore the best nearby spaces and activate a subscription when you want.'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.section>
 
                     {/* --- MASTER DASHBOARD GRID --- */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">

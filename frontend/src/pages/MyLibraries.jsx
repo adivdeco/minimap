@@ -6,7 +6,8 @@ import Navbar from '../components/Navbar';
 import { motion } from 'framer-motion';
 import {
     MapPin, Armchair, Edit, Power, Users, Eye, Star,
-    ArrowUpRight, Clock, Settings
+    ArrowUpRight, Clock, Settings,
+    LayoutDashboard
 } from 'lucide-react';
 
 const MyLibraries = () => {
@@ -78,7 +79,7 @@ const MyLibraries = () => {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
 
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                {/* <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -102,7 +103,7 @@ const MyLibraries = () => {
                             Library Settings
                         </button>
                     </motion.div>
-                </div>
+                </div> */}
 
                 {error && (
                     <motion.div
@@ -230,6 +231,15 @@ const MyLibraries = () => {
 
                                     {/* Action Buttons */}
                                     <div className="mt-auto space-y-3">
+ <button
+                                            onClick={() => navigate(`/library/${lib._id}/admin`)}
+                                            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+                                        >
+                                            <LayoutDashboard size={18} />
+                                            <span>Dashbord</span>
+                                            <ArrowUpRight size={16} className="opacity-60" />
+                                        </button>
+
                                         <button
                                             onClick={() => navigate(`/library/${lib._id}/users`)}
                                             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
@@ -238,15 +248,7 @@ const MyLibraries = () => {
                                             <span>All Users & Attendence History</span>
                                             <ArrowUpRight size={16} className="opacity-60" />
                                         </button>
-
-                                        <button
-                                            onClick={() => navigate(`/library/${lib._id}/admin`)}
-                                            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
-                                        >
-                                            <Users size={18} />
-                                            <span>Edit Subs & plans</span>
-                                            <ArrowUpRight size={16} className="opacity-60" />
-                                        </button>
+                                    
 
                                         <div className="grid grid-cols-2 gap-3">
                                             <button

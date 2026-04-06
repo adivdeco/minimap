@@ -86,25 +86,25 @@ const AdminAnalytics = ({ libraryId }) => {
     const StatCard = ({ icon: Icon, title, value, subtext, colorClass }) => (
         <motion.div 
             whileHover={{ y: -5 }}
-            className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all"
+            className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-lg transition-all"
         >
-            <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl ${colorClass}`}>
-                    <Icon size={24} />
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className={`p-2 sm:p-3 rounded-xl ${colorClass}`}>
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">{title}</div>
+                <div className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">{title}</div>
             </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{value}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium">
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-0.5 sm:mb-1">{value}</div>
+            <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium truncate">
                 {subtext}
             </div>
         </motion.div>
     );
 
     return (
-        <div className="space-y-8 pb-12">
+        <div className="space-y-4 sm:space-y-8 pb-12">
             {/* Quick Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard 
                     icon={DollarSign} 
                     title="Total Revenue" 
@@ -133,7 +133,7 @@ const AdminAnalytics = ({ libraryId }) => {
                     subtext={`From ${stats.library.totalReviews} customer reviews`}
                     colorClass="bg-yellow-500/10 text-yellow-500"
                 />
-            </div>
+            </div> */}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Revenue Trend Chart */}
@@ -148,7 +148,7 @@ const AdminAnalytics = ({ libraryId }) => {
                             <option>Weekly</option>
                         </select>
                     </div>
-                    <div className="h-[300px]">
+                    <div className="h-[250px] sm:h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={revenueData}>
                                 <defs>
@@ -179,8 +179,8 @@ const AdminAnalytics = ({ libraryId }) => {
                             <h3 className="font-bold text-gray-900 dark:text-white">Membership Status Distribution</h3>
                         </div>
                     </div>
-                    <div className="flex-1 flex flex-col md:flex-row items-center gap-8">
-                        <div className="h-[250px] w-full md:w-1/2">
+                    <div className="flex-1 flex flex-col md:flex-row items-center gap-4 sm:gap-8">
+                        <div className="h-[200px] sm:h-[250px] w-full md:w-1/2">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
@@ -226,7 +226,7 @@ const AdminAnalytics = ({ libraryId }) => {
                         <Clock className="text-orange-500" size={20} />
                         <h3 className="font-bold text-gray-900 dark:text-white">Peak Hours (Shifts)</h3>
                     </div>
-                    <div className="h-[300px]">
+                    <div className="h-[250px] sm:h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={shiftData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
@@ -258,7 +258,7 @@ const AdminAnalytics = ({ libraryId }) => {
                             <h3 className="font-bold text-gray-900 dark:text-white">Monthly Attendance Volume</h3>
                         </div>
                     </div>
-                    <div className="h-[300px]">
+                    <div className="h-[250px] sm:h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={attendanceChart}>
                                 <XAxis 

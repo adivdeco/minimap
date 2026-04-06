@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import PlanManagement from '../components/PlanManagement';
@@ -8,7 +8,7 @@ import NoticeManagement from '../components/NoticeManagement';
 import AdminAnalytics from '../components/dashboard/AdminAnalytics';
 import OccupancyWidget from '../components/dashboard/OccupancyWidget';
 import { toast } from 'react-toastify';
-import { Settings, Users, DollarSign, ArrowLeft, BellRing, LayoutDashboard } from 'lucide-react';
+import { Settings, Users, DollarSign, ArrowLeft, BellRing, LayoutDashboard, ChevronLeft } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -18,7 +18,7 @@ const LibraryAdminPanel = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    const [activeTab, setActiveTab] = useState('analytics'); // Default to analytics for insight-first view
+    const [activeTab, setActiveTab] = useState('analytics'); 
     const [loading, setLoading] = useState(true);
     const [statsLoading, setStatsLoading] = useState(true);
     const [libStats, setLibStats] = useState(null);
@@ -63,47 +63,54 @@ const LibraryAdminPanel = () => {
     if (!canAccess) return null;
 
     const tabs = [
-        { id: 'analytics', label: 'Analytics & Insights', icon: LayoutDashboard },
-        { id: 'subscriptions', label: 'User Subscriptions', icon: Users },
-        { id: 'plans', label: 'Plans Management', icon: DollarSign },
-        { id: 'notices', label: 'Announcements', icon: BellRing },
+        { id: 'analytics', label: 'Analytics', icon: LayoutDashboard },
+        { id: 'subscriptions', label: 'Users', icon: Users },
+        { id: 'plans', label: 'Plans', icon: DollarSign },
+        { id: 'notices', label: 'Notices', icon: BellRing },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#050505] transition-colors duration-300">
-            <Navbar />
+        <div className="min-h-screen bg-gray-50 dark:bg-[#050505] transition-colors duration-300 pb-20 sm:pb-0">
+            {/* Desktop Navbar stays for consistency */}
+            <div className="hidden sm:block">
+                <Navbar />
+            </div>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
-                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="flex items-center gap-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 mb-4 transition-colors font-medium text-sm"
-                    >
-                        <ArrowLeft size={16} /> Back to Dashboard
-                    </button>
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-blue-600/10 dark:bg-blue-500/20 rounded-xl">
-                                <Settings className="text-blue-600 dark:text-blue-400" size={28} />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Library Admin Panel</h1>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Manage and monitor your library's performance</p>
-                            </div>
+            {/* Mobile/Compact Header - Sticky & Slim */}
+            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-lg border-b border-gray-200 dark:border-white/10 px-4 py-3">
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => navigate(-1)}
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors text-gray-500"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <div>
+                            <h1 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-none">
+                                {libStats?.library?.name || "Admin Panel"}
+                            </h1>
                         </div>
+                    </div>
 
-                        {/* Real-time Occupancy Widget */}
+                    <div className="flex items-center gap-2">
                         <OccupancyWidget 
                             occupiedCount={libStats?.library?.occupiedSeats || 0} 
                             totalCapacity={libStats?.library?.totalSeats || 0}
                             loading={statsLoading}
+                            compact={true}
                         />
+                        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 rounded-full">
+                            <Settings size={14} className="text-blue-600" />
+                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Admin Mode</span>
+                        </div>
                     </div>
-                </motion.div>
+                </div>
+            </div>
 
-                {/* Modern Tabs */}
-                <div className="bg-white dark:bg-[#0F0F12] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 mb-8 overflow-x-auto p-1.5 flex gap-1 w-full sm:w-fit custom-scrollbar">
+            <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-6">
+                {/* Desktop Tabs */}
+                <div className="hidden sm:flex bg-white dark:bg-[#0F0F12] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 mb-8 p-1.5 gap-1 w-fit">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
@@ -111,12 +118,12 @@ const LibraryAdminPanel = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`relative flex items-center shrink-0 gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors z-10 ${isActive ? 'text-blue-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors z-10 ${isActive ? 'text-blue-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                                     }`}
                             >
                                 {isActive && (
                                     <motion.div
-                                        layoutId="admin-active-tab"
+                                        layoutId="admin-active-tab-desktop"
                                         className="absolute inset-0 bg-blue-50 dark:bg-white/10 rounded-xl -z-10"
                                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                     />
@@ -145,6 +152,32 @@ const LibraryAdminPanel = () => {
                         </motion.div>
                     </AnimatePresence>
                 </div>
+            </div>
+
+            {/* Mobile Bottom Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-white/90 dark:bg-[#0F0F12]/90 backdrop-blur-xl border-t border-gray-200 dark:border-white/10 px-6 py-3 flex items-center justify-between">
+                {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'text-blue-600 dark:text-white scale-110' : 'text-gray-400 dark:text-gray-500'}`}
+                        >
+                            <div className={`p-1.5 rounded-xl ${isActive ? 'bg-blue-600/10 dark:bg-white/10' : ''}`}>
+                                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-tight">{tab.label}</span>
+                            {isActive && (
+                                <motion.div 
+                                    layoutId="mobile-nav-dot"
+                                    className="w-1 h-1 bg-blue-600 dark:bg-white rounded-full mt-0.5"
+                                />
+                            )}
+                        </button>
+                    );
+                })}
             </div>
         </div>
     );
