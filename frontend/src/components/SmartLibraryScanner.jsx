@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Camera, X, CheckCircle, CreditCard, Gift, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Camera, X, CheckCircle, CreditCard, Gift, AlertCircle, Image as ImageIcon } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner'; // Import the scanner
+import jsQR from 'jsqr';
 import { checkInUser, activateTrialPlan } from '../api/entry';
 import { useAuth } from '../context/AuthContext';
 
@@ -14,6 +15,47 @@ const SmartLibraryScanner = ({ onClose }) => {
   // New State to toggle Camera UI
   const [isScanning, setIsScanning] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setCameraError('');
+    setIsScanning(false);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code && code.data) {
+          handleScan(code.data);
+        } else {
+          setLoading(false);
+          setScanResult('ERROR');
+          setMessage("Could not find a valid QR code in the uploaded image.");
+        }
+      };
+      img.onerror = () => {
+        setLoading(false);
+        setScanResult('ERROR');
+        setMessage("Invalid image file selected.");
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ''; // Reset input
+  };
 
   // Helper for Close Button
   const CloseButton = () => (
@@ -137,6 +179,24 @@ const SmartLibraryScanner = ({ onClose }) => {
           "Align the QR code within the frame"
         )}
       </p>
+
+      <button
+        onClick={() => {
+          setIsScanning(false);
+          fileInputRef.current?.click();
+        }}
+        className="mt-6 flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-full transition-all backdrop-blur-md font-medium"
+      >
+        <ImageIcon size={20} />
+        Scan from Gallery
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileUpload} 
+          accept="image/*" 
+          className="hidden" 
+        />
+      </button>
     </div>
   );
 
@@ -328,13 +388,30 @@ const SmartLibraryScanner = ({ onClose }) => {
           <p className="text-gray-400 text-lg leading-relaxed">Point your camera at the library entry QR code to check-in.</p>
         </div>
 
-        <button
-          onClick={() => setIsScanning(true)}
-          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-3"
-        >
-          <Camera size={24} />
-          Scan QR Code
-        </button>
+        <div className="space-y-4">
+          <button
+            onClick={() => setIsScanning(true)}
+            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-3"
+          >
+            <Camera size={24} />
+            Scan QR Code
+          </button>
+          
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white py-4 rounded-xl font-bold text-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-3"
+          >
+            <ImageIcon size={24} />
+            Upload QR Image
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              accept="image/*" 
+              className="hidden" 
+            />
+          </button>
+        </div>
       </div>
     </div>
   );
