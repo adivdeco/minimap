@@ -11,10 +11,10 @@ const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 const JWT_EXPIRY = 60 * 60 * 24 * 7; // ~16 days
 
 // Cookie options
-// Cookie options
 const getCookieOptions = () => {
     return {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // explicitly ensure browsers do not treat this as a session cookie
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',

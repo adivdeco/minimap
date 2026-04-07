@@ -13,8 +13,15 @@ const Login = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, isAuthenticated: isAppAuthenticated } = useAuth();
     const { loginWithRedirect, user: auth0User, isAuthenticated } = useAuth0();
+
+    // Redirect to home if already logged in (prevents back-button logout loops)
+    useEffect(() => {
+        if (isAppAuthenticated) {
+            navigate('/', { replace: true });
+        }
+    }, [isAppAuthenticated, navigate]);
 
     // Handle Auth0 login success
     useEffect(() => {
@@ -28,7 +35,7 @@ const Login = () => {
 
                     if (response.success && response.user) {
                         login(response.user);
-                        navigate('/');
+                        navigate('/', { replace: true });
                     }
                 } catch (err) {
                     console.error("Auth0 Backend Sync Error:", err);
@@ -51,7 +58,7 @@ const Login = () => {
             const response = await apiLogin(email, password);
             if (response.success && response.user) {
                 login(response.user);
-                navigate('/');
+                navigate('/', { replace: true });
             } else {
                 setError(response.error || 'Login failed');
             }

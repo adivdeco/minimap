@@ -15,7 +15,7 @@ const apiLimiter = rateLimit({
 // Stricter Auth Rate Limiter (Login/Register)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 15, // Limit each IP to 20 login/register attempts per windowMs
+    max: 100, // Increased limit: allows up to 100 login/register attempts per IP to support library owners onboarding multiple users
     standardHeaders: true,
     legacyHeaders: false,
     message: {
