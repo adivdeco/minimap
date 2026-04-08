@@ -342,7 +342,13 @@ const socialLogin = async (req, res) => {
 // @route   POST /api/auth/logout
 const logoutUser = async (req, res) => {
     try {
-        res.cookie('token', null, { expires: new Date(Date.now()), path: '/' });
+        const options = getCookieOptions();
+        // Set expires to the past and remove maxAge to clear the cookie
+        res.cookie('token', null, {
+            ...options,
+            expires: new Date(0),
+            maxAge: 0
+        });
 
         res.status(200).json({
             success: true,

@@ -7,7 +7,12 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const { user: auth0User, isAuthenticated: isAuth0Authenticated, isLoading: auth0Loading } = useAuth0();
+    const {
+        user: auth0User,
+        isAuthenticated: isAuth0Authenticated,
+        isLoading: auth0Loading,
+        logout: auth0Logout
+    } = useAuth0();
 
     useEffect(() => {
         // Check for existing session on mount
@@ -66,8 +71,28 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
-        await apiLogout();
-        setUser(null);
+        try {
+            // 1. Call backend logout to clear server-side session/cookie
+            await apiLogout();
+
+            // 2. Clear local state
+            setUser(null);
+            localStorage.removeItem('user');
+
+            // 3. Clear Auth0 session if authenticated via Auth0
+            if (isAuth0Authenticated) {
+                auth0Logout({
+                    logoutParams: {
+                        returnTo: window.location.origin
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Logout failed:", error);
+            // Fallback: still clear local state
+            setUser(null);
+            localStorage.removeItem('user');
+        }
     };
 
     const checkAuth = async () => {
