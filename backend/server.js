@@ -14,6 +14,7 @@ const seatRoutes = require('./routes/seatRoutes');
 const entryRoutes = require('./routes/entryRoutes');
 const planRoutes = require('./routes/planRoutes');
 const noticeRoutes = require('./routes/noticeRoutes');
+const quizRoutes = require('./routes/quizRoutes');
 
 // Connect to database
 connectDB();
@@ -68,6 +69,7 @@ app.use('/api/seats', seatRoutes);
 app.use('/api/entry', entryRoutes);
 app.use('/api/plans', planRoutes);
 app.use('/api/notices', noticeRoutes);
+app.use('/api/quizzes', quizRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
