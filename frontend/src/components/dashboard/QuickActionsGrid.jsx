@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, PlusCircle, BookOpen, Users, CreditCard, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, BookOpen, Users, CreditCard, ChevronRight, Brain } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const itemVariants = {
@@ -70,6 +70,14 @@ const QuickActionsGrid = ({ isAdmin, userRole, setShowAttendance }) => {
                         onClick={() => navigate('/users')}
                     />
                 )}
+
+                {/* Always show quizzes for learning */}
+                <ActionCard
+                    icon={<Brain size={24} className="text-orange-600 dark:text-orange-400" />}
+                    title="Quizzes & Mocks"
+                    subtitle="Daily practice tests"
+                    onClick={() => navigate('/quizzes')}
+                />
 
                 {/* Generic fallback for students */}
                 {!isAdmin && userRole !== 'library_owner' && (
