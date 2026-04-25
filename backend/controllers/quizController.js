@@ -6,9 +6,8 @@ exports.createQuiz = async (req, res) => {
 
         // Allowed roles to create (could be customized later)
         const allowedRoles = ['admin', 'co-admin'];
-        if (req.user && !allowedRoles.includes(req.user.role)) {
-            // Silently allow for testing or enforce here. Right now, let's just create it.
-            // But realistically, only admins should create. I will enforce it loosely.
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            return res.status(403).json({ message: "Forbidden: Only admins or co-admins can perform this action." });
         }
 
         const newQuiz = new Quiz({
@@ -53,6 +52,11 @@ exports.getQuizzes = async (req, res) => {
 
 exports.updateQuiz = async (req, res) => {
     try {
+        const allowedRoles = ['admin', 'co-admin'];
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            return res.status(403).json({ message: "Forbidden: Only admins or co-admins can perform this action." });
+        }
+
         const { id } = req.params;
         const updatableFields = ['title', 'category', 'questions', 'time', 'difficulty', 'iconName', 'themeColor'];
 
@@ -78,12 +82,21 @@ exports.updateQuiz = async (req, res) => {
 
 exports.deleteQuiz = async (req, res) => {
     try {
+        const allowedRoles = ['admin', 'co-admin'];
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            return res.status(403).json({ message: "Forbidden: Only admins or co-admins can perform this action." });
+        }
+
         const { id } = req.params;
         const deletedQuiz = await Quiz.findByIdAndDelete(id);
 
         if (!deletedQuiz) {
             return res.status(404).json({ message: "Mock test not found" });
         }
+
+        // Cascade delete questions
+        const Question = require('../models/Questions');
+        await Question.deleteMany({ quizId: id });
 
         res.status(200).json({ message: "Mock test deleted successfully" });
     } catch (err) {

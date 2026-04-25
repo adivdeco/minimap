@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Search, Clock, Target, Atom, Beaker, Award, Code, Brain, Zap, Plus, Edit2, Trash2, X, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Search, Clock, Target, Atom, Beaker, Award, Code, Brain, Zap, Plus, Edit2, Trash2, X, AlertCircle, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
 const CATEGORIES = ["All", "Class 10", "Class 11", "Class 12", "IIT JEE", "NEET", "General"];
@@ -47,6 +48,8 @@ const modalVariants = {
 
 const Quizzes = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const canManageQuizzes = user?.role === 'admin' || user?.role === 'co-admin';
     const [activeCategory, setActiveCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [quizzes, setQuizzes] = useState([]);
@@ -56,6 +59,11 @@ const Quizzes = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [currentQuizId, setCurrentQuizId] = useState(null);
+    
+    // Test Taking State
+    const [isAcknowledgeModalOpen, setIsAcknowledgeModalOpen] = useState(false);
+    const [selectedQuizForTest, setSelectedQuizForTest] = useState(null);
+    
     const [formData, setFormData] = useState({
         title: '',
         category: 'Class 10',
@@ -66,7 +74,7 @@ const Quizzes = () => {
         themeColor: 'emerald'
     });
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const API_URL = import.meta.env.VITE_API_URL;
 
     useEffect(() => {
         fetchQuizzes();
@@ -140,6 +148,17 @@ const Quizzes = () => {
         }
     };
 
+    const handleStartPractice = (quiz) => {
+        setSelectedQuizForTest(quiz);
+        setIsAcknowledgeModalOpen(true);
+    };
+
+    const confirmStartPractice = () => {
+        if (selectedQuizForTest) {
+            navigate(`/test-runner/${selectedQuizForTest._id}`, { state: { quiz: selectedQuizForTest } });
+        }
+    };
+
     const filteredQuizzes = quizzes.filter(quiz => {
         const matchesCategory = activeCategory === 'All' || quiz.category === activeCategory;
         const matchesSearch = quiz.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -168,13 +187,15 @@ const Quizzes = () => {
                             </div>
                         </div>
                         
-                        <button 
-                            onClick={() => handleOpenModal()}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-indigo-500/20 transition-all"
-                        >
-                            <Plus size={18} />
-                            Add Mock Test
-                        </button>
+                        {canManageQuizzes && (
+                            <button 
+                                onClick={() => handleOpenModal()}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-indigo-500/20 transition-all"
+                            >
+                                <Plus size={18} />
+                                Add Mock Test
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-5 items-center justify-between">
@@ -239,15 +260,20 @@ const Quizzes = () => {
                                             exit="exit"
                                             className={`group relative flex flex-col justify-between p-5 rounded-2xl bg-white dark:bg-zinc-900/40 backdrop-blur-md border border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 shadow-sm hover:shadow-md transition-all duration-300 ${theme.darkHover}`}
                                         >
-                                            {/* Edit / Delete Buttons -> Reveal on hover */}
-                                            <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleOpenModal(quiz)} className="p-1.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                                                    <Edit2 size={14} />
-                                                </button>
-                                                <button onClick={() => handleDeleteQuiz(quiz._id)} className="p-1.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
+                                            {/* Edit / Delete / Manage Questions Buttons -> Reveal on hover */}
+                                            {canManageQuizzes && (
+                                                <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                                    <button onClick={(e) => { e.stopPropagation(); navigate(`/quizzes/${quiz._id}/manage`, { state: { quiz } }); }} className="p-1.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" title="Manage Questions">
+                                                        <Database size={14} />
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleOpenModal(quiz); }} className="p-1.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Edit Assessment">
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteQuiz(quiz._id); }} className="p-1.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" title="Delete Assessment">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             <div>
                                                 <div className="flex justify-between items-start mb-4">
@@ -282,7 +308,7 @@ const Quizzes = () => {
                                                 </div>
                                             </div>
 
-                                            <button className="w-full py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-100 text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-900 text-sm font-semibold transition-all duration-300 border border-zinc-200 dark:border-zinc-700/50 group-hover:border-zinc-300">
+                                            <button onClick={() => handleStartPractice(quiz)} className="w-full py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-100 text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-900 text-sm font-semibold transition-all duration-300 border border-zinc-200 dark:border-zinc-700/50 group-hover:border-zinc-300">
                                                 Start Practice
                                             </button>
                                         </motion.div>
@@ -429,6 +455,52 @@ const Quizzes = () => {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Acknowledgment Modal */}
+            <AnimatePresence>
+                {isAcknowledgeModalOpen && selectedQuizForTest && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }} 
+                            animate={{ opacity: 1 }} 
+                            exit={{ opacity: 0 }} 
+                            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                            onClick={() => setIsAcknowledgeModalOpen(false)}
+                        />
+                        <motion.div 
+                            variants={modalVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            className="relative w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-6 text-center border border-zinc-200 dark:border-zinc-800 z-10"
+                        >
+                            <div className="w-16 h-16 mx-auto rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center mb-4 text-indigo-600 dark:text-indigo-400">
+                                <AlertCircle size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">Ready to Begin?</h3>
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+                                You are about to start <span className="font-semibold text-zinc-900 dark:text-zinc-200">"{selectedQuizForTest.title}"</span>. 
+                                The timer will be set to <span className="font-semibold text-zinc-900 dark:text-zinc-200">{selectedQuizForTest.time} minutes</span> and will start immediately.
+                            </p>
+                            
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => setIsAcknowledgeModalOpen(false)}
+                                    className="flex-1 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={confirmStartPractice}
+                                    className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/30 transition-all"
+                                >
+                                    Proceed
+                                </button>
+                            </div>
                         </motion.div>
                     </div>
                 )}

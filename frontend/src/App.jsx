@@ -20,10 +20,12 @@ const LibraryDetails = lazy(() => import('./pages/LibraryDetails'));
 const LibraryAdminPanel = lazy(() => import('./pages/LibraryAdminPanel'));
 const Profile = lazy(() => import('./pages/Profile'));
 const ManageUsers = lazy(() => import('./components/LibraryUsersManagement'));
+const ManageQuestions = lazy(() => import('./pages/ManageQuestions'));
 
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Quizzes from './pages/Quizzes';
+import QuizRunner from './pages/QuizRunner';
 
 function App() {
   return (
@@ -52,6 +54,8 @@ function App() {
                 <Route path="/library/:id/users" element={<ProtectedRoute><ManageUsers /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/quizzes" element={<ProtectedRoute><Quizzes /></ProtectedRoute>} />
+                <Route path="/quizzes/:id/manage" element={<ProtectedRoute><ManageQuestions /></ProtectedRoute>} />
+                <Route path="/test-runner/:id" element={<ProtectedRoute><QuizRunner /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>

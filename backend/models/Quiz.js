@@ -11,12 +11,21 @@ const quizSchema = new Schema({
         type: String,
         required: true,
         trim: true
-    },
+    }, // e.g., 'Academic', 'Competitive'
+    targetAudience: { 
+        type: String, 
+        required: true, 
+        index: true 
+    }, // 'Class 10', 'CGL'
     questions: {
         type: Number,
         required: true,
         min: 1
     },
+    questionList: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Question'
+    }],
     time: {
         type: Number,
         required: true,
@@ -40,5 +49,8 @@ const quizSchema = new Schema({
         ref: 'User'
     }
 }, { timestamps: true });
+
+// Ensure virtuals are included when converting to JSON for your frontend
+quizSchema.set('toJSON', { virtuals: true });
 
 module.exports = mongoose.model('Quiz', quizSchema);
