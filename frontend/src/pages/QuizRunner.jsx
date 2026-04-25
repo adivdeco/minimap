@@ -129,7 +129,7 @@ const QuizRunner = () => {
                         We are currently preparing questions for this assessment. You will be notified when it's available.
                     </p>
                     <button 
-                        onClick={() => navigate('/quizzes')}
+                        onClick={() => navigate('/quizzes', { replace: true })}
                         className="w-full py-3.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
                     >
                         Return to Dashboard
@@ -191,7 +191,7 @@ const QuizRunner = () => {
                     </div>
 
                     <button 
-                        onClick={() => navigate('/quizzes')}
+                        onClick={() => navigate('/quizzes', { replace: true })}
                         className="w-full py-3.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
                     >
                         Return to Dashboard
@@ -211,7 +211,7 @@ const QuizRunner = () => {
             <header className="sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-8 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <button 
-                        onClick={() => navigate('/quizzes')} 
+                        onClick={() => navigate('/quizzes', { replace: true })} 
                         className="p-2 -ml-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
                         title="Exit Test"
                     >
