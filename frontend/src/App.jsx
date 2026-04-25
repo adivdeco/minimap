@@ -26,6 +26,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Quizzes from './pages/Quizzes';
 import QuizRunner from './pages/QuizRunner';
+import QuizResults from './pages/QuizResults';
 
 function App() {
   return (
@@ -56,6 +57,7 @@ function App() {
                 <Route path="/quizzes" element={<ProtectedRoute><Quizzes /></ProtectedRoute>} />
                 <Route path="/quizzes/:id/manage" element={<ProtectedRoute><ManageQuestions /></ProtectedRoute>} />
                 <Route path="/test-runner/:id" element={<ProtectedRoute><QuizRunner /></ProtectedRoute>} />
+                <Route path="/quiz-results/:id" element={<ProtectedRoute><QuizResults /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>

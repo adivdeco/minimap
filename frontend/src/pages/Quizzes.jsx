@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Search, Clock, Target, Atom, Beaker, Award, Code, Brain, Zap, Plus, Edit2, Trash2, X, AlertCircle, Database } from 'lucide-react';
+import { ChevronLeft, Search, Clock, Target, Atom, Beaker, Award, Code, Brain, Zap, Plus, Edit2, Trash2, X, AlertCircle, Database, Trophy, RotateCcw, Eye, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -54,6 +54,7 @@ const Quizzes = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [quizzes, setQuizzes] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [progressMap, setProgressMap] = useState({});
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -83,8 +84,12 @@ const Quizzes = () => {
     const fetchQuizzes = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`${API_URL}/quizzes`, { withCredentials: true });
-            setQuizzes(res.data.quizzes || []);
+            const [quizRes, progressRes] = await Promise.all([
+                axios.get(`${API_URL}/quizzes`, { withCredentials: true }),
+                axios.get(`${API_URL}/quiz-progress/batch`, { withCredentials: true }).catch(() => ({ data: { progressMap: {} } }))
+            ]);
+            setQuizzes(quizRes.data.quizzes || []);
+            setProgressMap(progressRes.data.progressMap || {});
         } catch (error) {
             console.error("Failed to fetch quizzes", error);
             toast.error("Failed to load assessments.");
@@ -308,9 +313,40 @@ const Quizzes = () => {
                                                 </div>
                                             </div>
 
-                                            <button onClick={() => handleStartPractice(quiz)} className="w-full py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-100 text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-900 text-sm font-semibold transition-all duration-300 border border-zinc-200 dark:border-zinc-700/50 group-hover:border-zinc-300">
-                                                Start Practice
-                                            </button>
+                                            {/* Progress Badge + Buttons */}
+                                            {(() => {
+                                                const prog = progressMap[quiz._id];
+                                                const hasAttempted = prog && prog.totalAttempts > 0;
+                                                if (hasAttempted) {
+                                                    const pct = quiz.questions > 0 ? Math.round((prog.bestScore / quiz.questions) * 100) : 0;
+                                                    const pctColor = pct >= 80 ? 'text-emerald-600 dark:text-emerald-400' : pct >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400';
+                                                    return (
+                                                        <>
+                                                            <div className="flex items-center justify-between mb-3 px-1">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Trophy size={13} className="text-amber-500" />
+                                                                    <span className={`text-xs font-bold ${pctColor}`}>{pct}%</span>
+                                                                    <span className="text-[10px] text-zinc-400">best</span>
+                                                                </div>
+                                                                <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">{prog.totalAttempts} attempt{prog.totalAttempts > 1 ? 's' : ''}</span>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => handleStartPractice(quiz)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-100 text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-900 text-sm font-semibold transition-all duration-300 border border-zinc-200 dark:border-zinc-700/50">
+                                                                    <RotateCcw size={14} /> Retry
+                                                                </button>
+                                                                <button onClick={() => navigate(`/quiz-results/${quiz._id}`, { state: { quiz } })} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all duration-300 border border-indigo-200 dark:border-indigo-500/30">
+                                                                    <Eye size={14} /> Results
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                }
+                                                return (
+                                                    <button onClick={() => handleStartPractice(quiz)} className="w-full py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 hover:bg-zinc-100 dark:hover:bg-zinc-100 text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-900 text-sm font-semibold transition-all duration-300 border border-zinc-200 dark:border-zinc-700/50 group-hover:border-zinc-300">
+                                                        Start Practice
+                                                    </button>
+                                                );
+                                            })()}
                                         </motion.div>
                                     );
                                 })

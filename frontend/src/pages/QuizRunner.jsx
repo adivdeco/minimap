@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Timer, ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft, Target } from 'lucide-react';
+import { Timer, ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft, Target, XCircle, MinusCircle, Eye, Trophy, BarChart3, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import axios from 'axios';
 
 const QuizRunner = () => {
@@ -17,6 +17,12 @@ const QuizRunner = () => {
     const [timeLeft, setTimeLeft] = useState(quiz.time * 60);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState({});
+
+    // Result state
+    const [resultData, setResultData] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showReview, setShowReview] = useState(false);
+    const [expandedQ, setExpandedQ] = useState(null);
 
     const [questions, setQuestions] = useState([]);
     const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
@@ -55,12 +61,23 @@ const QuizRunner = () => {
     }, [countdownTimer, phase]);
 
     // Phase 2: Actual Test Timer
+    const autoSubmitTriggered = React.useRef(false);
     useEffect(() => {
         if (phase === 'test' && timeLeft > 0) {
             const timer = setInterval(() => {
                 setTimeLeft(prev => {
-                    if (prev <= 1) {
-                        setPhase('submitted');
+                    if (prev <= 1 && !autoSubmitTriggered.current) {
+                        autoSubmitTriggered.current = true;
+                        // Auto-submit via API
+                        const timeTaken = quiz.time * 60;
+                        const responses = Object.entries(answers).map(([qIdx, optIdx]) => ({
+                            questionId: questions[parseInt(qIdx)]?._id,
+                            selectedOptionIndex: optIdx
+                        })).filter(r => r.questionId);
+                        axios.post(`${API_URL}/quiz-progress/${id}/submit`, { responses, timeTaken }, { withCredentials: true })
+                            .then(res => setResultData(res.data))
+                            .catch(() => {})
+                            .finally(() => setPhase('submitted'));
                         return 0;
                     }
                     return prev - 1;
@@ -98,8 +115,31 @@ const QuizRunner = () => {
         setAnswers(newAnswers);
     };
 
-    const handleSubmit = () => {
-        if(confirm("Are you sure you want to submit your test?")) {
+    const handleSubmit = async () => {
+        if(!confirm("Are you sure you want to submit your test?")) return;
+        setIsSubmitting(true);
+        try {
+            const timeTaken = (quiz.time * 60) - timeLeft;
+            const responses = Object.entries(answers).map(([qIdx, optIdx]) => ({
+                questionId: questions[parseInt(qIdx)]._id,
+                selectedOptionIndex: optIdx
+            }));
+            const res = await axios.post(`${API_URL}/quiz-progress/${id}/submit`, { responses, timeTaken }, { withCredentials: true });
+            setResultData(res.data);
+        } catch (err) {
+            console.error('Submit error:', err);
+            // Fallback: local scoring
+            let correct = 0;
+            const details = questions.map((q, i) => {
+                const sel = answers[i];
+                const isCorrect = sel !== undefined && sel === q.correctOptionIndex;
+                if (isCorrect) correct++;
+                return { questionText: q.questionText, options: q.options, correctOptionIndex: q.correctOptionIndex, explanation: q.explanation || '', selectedOptionIndex: sel ?? -1, isCorrect: sel !== undefined ? isCorrect : false };
+            });
+            const attempted = Object.keys(answers).length;
+            setResultData({ score: correct, total: questions.length, correct, wrong: attempted - correct, skipped: questions.length - attempted, timeTaken: (quiz.time * 60) - timeLeft, detailedResults: details, bestScore: correct, totalAttempts: 1 });
+        } finally {
+            setIsSubmitting(false);
             setPhase('submitted');
         }
     };
@@ -165,38 +205,149 @@ const QuizRunner = () => {
 
     // --- RENDER SUBMITTED PHASE ---
     if (phase === 'submitted') {
+        const r = resultData;
         const attempted = Object.keys(answers).length;
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6">
-                <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="max-w-md w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 text-center shadow-xl"
-                >
-                    <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-6 border-8 border-white dark:border-zinc-950 shadow-sm">
-                        <CheckCircle2 size={40} strokeWidth={2.5} />
-                    </div>
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Test Submitted!</h2>
-                    <p className="text-zinc-500 dark:text-zinc-400 mb-8">Your responses have been successfully recorded.</p>
-                    
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                            <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">{attempted}</div>
-                            <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Attempted</div>
-                        </div>
-                        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                            <div className="text-3xl font-bold text-zinc-400 dark:text-zinc-500 mb-1">{questions.length - attempted}</div>
-                            <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Skipped</div>
-                        </div>
-                    </div>
+        const fmtTime = (s) => `${Math.floor(s/60)}m ${s%60}s`;
 
-                    <button 
-                        onClick={() => navigate('/quizzes', { replace: true })}
-                        className="w-full py-3.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
-                    >
-                        Return to Dashboard
-                    </button>
-                </motion.div>
+        // If still submitting or no result yet
+        if (isSubmitting || !r) {
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            );
+        }
+
+        const pct = r.total > 0 ? Math.round((r.correct / r.total) * 100) : 0;
+        const circumference = 2 * Math.PI * 54;
+        const strokeDash = (pct / 100) * circumference;
+        const gradeColor = pct >= 80 ? 'text-emerald-500' : pct >= 50 ? 'text-amber-500' : 'text-rose-500';
+        const gradeStroke = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#f43f5e';
+        const gradeLabel = pct >= 80 ? 'Excellent!' : pct >= 50 ? 'Good Effort' : 'Keep Practicing';
+
+        return (
+            <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 sm:p-6">
+                <div className="max-w-2xl mx-auto">
+                    {/* Score Card */}
+                    <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 text-center shadow-xl mb-4">
+                        
+                        {/* Score Ring */}
+                        <div className="relative w-36 h-36 mx-auto mb-5">
+                            <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                                <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-200 dark:text-zinc-800" />
+                                <motion.circle cx="60" cy="60" r="54" fill="none" stroke={gradeStroke} strokeWidth="8" strokeLinecap="round"
+                                    strokeDasharray={circumference} initial={{ strokeDashoffset: circumference }}
+                                    animate={{ strokeDashoffset: circumference - strokeDash }} transition={{ duration: 1.5, ease: "easeOut" }} />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className={`text-3xl font-bold ${gradeColor}`}>{pct}%</span>
+                                <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Score</span>
+                            </div>
+                        </div>
+
+                        <h2 className="text-xl font-bold text-zinc-900 dark:text-white mb-1">{gradeLabel}</h2>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{r.correct} out of {r.total} correct</p>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
+                            <div className="bg-emerald-50 dark:bg-emerald-500/10 p-3 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
+                                <CheckCircle2 size={18} className="mx-auto text-emerald-500 mb-1" />
+                                <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{r.correct}</div>
+                                <div className="text-[10px] font-medium text-emerald-600/70 dark:text-emerald-400/70 uppercase">Correct</div>
+                            </div>
+                            <div className="bg-rose-50 dark:bg-rose-500/10 p-3 rounded-2xl border border-rose-100 dark:border-rose-500/20">
+                                <XCircle size={18} className="mx-auto text-rose-500 mb-1" />
+                                <div className="text-xl font-bold text-rose-600 dark:text-rose-400">{r.wrong}</div>
+                                <div className="text-[10px] font-medium text-rose-600/70 dark:text-rose-400/70 uppercase">Wrong</div>
+                            </div>
+                            <div className="bg-zinc-100 dark:bg-zinc-800/50 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                                <MinusCircle size={18} className="mx-auto text-zinc-400 mb-1" />
+                                <div className="text-xl font-bold text-zinc-500 dark:text-zinc-400">{r.total - attempted}</div>
+                                <div className="text-[10px] font-medium text-zinc-500/70 uppercase">Skipped</div>
+                            </div>
+                            <div className="bg-indigo-50 dark:bg-indigo-500/10 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
+                                <Clock size={18} className="mx-auto text-indigo-500 mb-1" />
+                                <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{fmtTime(r.timeTaken)}</div>
+                                <div className="text-[10px] font-medium text-indigo-600/70 dark:text-indigo-400/70 uppercase">Time</div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowReview(!showReview)}
+                                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-indigo-600 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors text-sm">
+                                <Eye size={16} /> {showReview ? 'Hide' : 'Review'} Answers
+                            </button>
+                            <button onClick={() => navigate('/quizzes', { replace: true })}
+                                className="flex-1 py-3 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors text-sm">
+                                Dashboard
+                            </button>
+                        </div>
+                    </motion.div>
+
+                    {/* Question Review */}
+                    <AnimatePresence>
+                    {showReview && r.detailedResults && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                            className="space-y-3 overflow-hidden">
+                            {r.detailedResults.map((q, i) => {
+                                const wasSkipped = q.selectedOptionIndex === undefined || q.selectedOptionIndex === -1;
+                                const isExpanded = expandedQ === i;
+                                return (
+                                    <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                                        className={`bg-white dark:bg-zinc-900 border rounded-2xl overflow-hidden transition-colors ${
+                                            wasSkipped ? 'border-zinc-200 dark:border-zinc-800' : q.isCorrect ? 'border-emerald-200 dark:border-emerald-500/30' : 'border-rose-200 dark:border-rose-500/30'
+                                        }`}>
+                                        {/* Question Header */}
+                                        <button onClick={() => setExpandedQ(isExpanded ? null : i)}
+                                            className="w-full flex items-center gap-3 p-4 text-left">
+                                            <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                                wasSkipped ? 'bg-zinc-400' : q.isCorrect ? 'bg-emerald-500' : 'bg-rose-500'
+                                            }`}>
+                                                {wasSkipped ? <MinusCircle size={14}/> : q.isCorrect ? <CheckCircle2 size={14}/> : <XCircle size={14}/>}
+                                            </div>
+                                            <span className="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-1">
+                                                Q{i+1}. {q.questionText}
+                                            </span>
+                                            {isExpanded ? <ChevronUp size={16} className="text-zinc-400"/> : <ChevronDown size={16} className="text-zinc-400"/>}
+                                        </button>
+
+                                        {/* Expanded Details */}
+                                        {isExpanded && (
+                                            <div className="px-4 pb-4 pt-0 border-t border-zinc-100 dark:border-zinc-800">
+                                                <p className="text-sm text-zinc-700 dark:text-zinc-300 mb-3 mt-3">{q.questionText}</p>
+                                                <div className="space-y-2 mb-3">
+                                                    {q.options.map((opt, oi) => {
+                                                        const isCorrectOpt = oi === q.correctOptionIndex;
+                                                        const isUserPick = oi === q.selectedOptionIndex;
+                                                        let cls = 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/30';
+                                                        if (isCorrectOpt) cls = 'border-emerald-300 dark:border-emerald-500/40 bg-emerald-50 dark:bg-emerald-500/10';
+                                                        if (isUserPick && !q.isCorrect) cls = 'border-rose-300 dark:border-rose-500/40 bg-rose-50 dark:bg-rose-500/10';
+                                                        return (
+                                                            <div key={oi} className={`flex items-center gap-3 p-3 rounded-xl border text-sm ${cls}`}>
+                                                                <span className="flex-1 text-zinc-700 dark:text-zinc-300">{opt}</span>
+                                                                {isCorrectOpt && <CheckCircle2 size={16} className="text-emerald-500 shrink-0"/>}
+                                                                {isUserPick && !isCorrectOpt && <XCircle size={16} className="text-rose-500 shrink-0"/>}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {q.explanation && (
+                                                    <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-xl p-3">
+                                                        <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 mb-1">Explanation</p>
+                                                        <p className="text-sm text-indigo-800 dark:text-indigo-200">{q.explanation}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                );
+                            })}
+                        </motion.div>
+                    )}
+                    </AnimatePresence>
+                </div>
             </div>
         );
     }
