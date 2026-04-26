@@ -31,18 +31,6 @@ app.set("trust proxy", 1);
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 // Middleware
-app.use(helmet());
-app.use(compression());
-app.use(
-    helmet.contentSecurityPolicy({
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'"],
-            objectSrc: ["'none'"],
-            upgradeInsecureRequests: [],
-        },
-    })
-);
 app.use(cors({
     origin: [
         "http://localhost:5173",
@@ -56,6 +44,19 @@ app.use(cors({
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
+
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+}));
+app.use(compression());
 app.use(express.json());
 app.use(cookieParser());
 
