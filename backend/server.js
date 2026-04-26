@@ -3,7 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
-const compression = require('compression');
+// const compression = require('compression');
 // Load env vars
 dotenv.config();
 
@@ -30,54 +30,35 @@ app.set("trust proxy", 1);
 
 const { apiLimiter } = require('./middleware/rateLimiter');
 
-// Request Logging for Debugging
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.headers.origin || 'No Origin'}`);
-    next();
-});
 
-// Manual CORS implementation for maximum compatibility
-app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "https://studyspace-two.vercel.app"
-    ];
-
-    if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'))) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-    } else if (!origin) {
-        // For tools like Postman or server-to-server
-        res.setHeader('Access-Control-Allow-Origin', '*');
-    }
-
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
-
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-    next();
-});
-
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-    contentSecurityPolicy: {
+// Middleware
+app.use(helmet());
+app.use(
+    helmet.contentSecurityPolicy({
         directives: {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'"],
             objectSrc: ["'none'"],
             upgradeInsecureRequests: [],
         },
-    },
+    })
+);
+app.use(cors({
+    origin: [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        process.env.APP_URL,
+        "https://studyspace-two.vercel.app"
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
-app.use(compression());
+
+
+// app.use(compression());
 app.use(express.json());
 app.use(cookieParser());
 
