@@ -7,7 +7,7 @@ import CountdownTimer from '../components/CountdownTimer';
 import UserSeatMap from '../components/UserSeatMap';
 import { getLibrarySeats } from '../api/seat';
 import { getNotices } from '../api/notice';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -118,8 +118,7 @@ const Home = () => {
 
         setCheckingOut(true);
         try {
-            const API_URL = import.meta.env.VITE_API_URL;
-            const response = await axios.post(`${API_URL}/entry/check-out`, {}, { withCredentials: true });
+            const response = await axiosClient.post('/entry/check-out', {});
 
             const { remainingTime, checkinsRemaining, maxDailyCheckins, msg } = response.data;
             const remainingTimeStr = remainingTime ? `${remainingTime.hours}h ${remainingTime.minutes}m` : '';
@@ -139,7 +138,7 @@ const Home = () => {
 
             if (checkAuth) checkAuth();
         } catch (error) {
-            console.error(error);
+
             toast.error(error.response?.data?.msg || "Checkout failed");
         } finally {
             setCheckingOut(false);

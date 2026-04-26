@@ -150,7 +150,7 @@ const SmartLibraryScanner = ({ onClose }) => {
             }
           }}
           onError={(error) => {
-            console.error(error);
+
             setCameraError("Please allow camera permissions to scan.");
           }}
           components={{

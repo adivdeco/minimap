@@ -61,7 +61,7 @@ const MapLocationPicker = ({ defaultLocation, onLocationSelect }) => {
                     setLoadingLocation(false);
                 },
                 (err) => {
-                    console.error("Error getting location: ", err);
+
                     alert("Unable to fetch location. Please ensure location permissions are granted.");
                     setLoadingLocation(false);
                 }

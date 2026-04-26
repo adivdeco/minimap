@@ -90,7 +90,7 @@ const Quizzes = () => {
             setQuizzes(quizRes.data.quizzes || []);
             setProgressMap(progressRes.data.progressMap || {});
         } catch (error) {
-            console.error("Failed to fetch quizzes", error);
+
             toast.error("Failed to load assessments.");
         } finally {
             setLoading(false);
@@ -135,7 +135,7 @@ const Quizzes = () => {
             fetchQuizzes();
             handleCloseModal();
         } catch (error) {
-            console.error("Error saving quiz:", error);
+
             toast.error(error.response?.data?.message || "Something went wrong.");
         }
     };
@@ -147,7 +147,7 @@ const Quizzes = () => {
             toast.success("Mock test deleted successfully.");
             fetchQuizzes();
         } catch (error) {
-            console.error("Error deleting quiz:", error);
+
             toast.error("Failed to delete the mock test.");
         }
     };

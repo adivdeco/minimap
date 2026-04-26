@@ -61,7 +61,7 @@ export function OwnerShiftChart({ libraryId }) {
           setTotalVisitors(response.totalVisitors || 0)
         }
       } catch (error) {
-        console.error("Failed to fetch shift analytics:", error)
+
       } finally {
         setLoading(false)
       }

@@ -76,7 +76,7 @@ export function OwnerAttendanceChart({ libraryId }) {
           setChartData(processedData)
         }
       } catch (error) {
-        console.error("Failed to fetch attendance for chart", error)
+
       } finally {
         setLoading(false)
       }
@@ -98,7 +98,7 @@ export function OwnerAttendanceChart({ libraryId }) {
           setDayDetails(response.users || []);
         }
       } catch (error) {
-        console.error("Failed to fetch detailed attendees:", error);
+
       } finally {
         setLoadingDetails(false);
       }

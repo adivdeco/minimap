@@ -3,9 +3,8 @@
  * Utility functions for managing library users and analytics
  */
 
-import axios from 'axios';
+import axiosClient from './axiosClient';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api';
 
 /**
  * Get all users in a library with pagination and filtering
@@ -21,13 +20,11 @@ export const getLibraryUsers = async (libraryId, filters = {}) => {
             ...(filters.search && { search: filters.search })
         };
 
-        const response = await axios.get(`${API_BASE_URL}/library/${libraryId}/users`, {
-            params,
-            withCredentials: true
+        const response = await axiosClient.get(`/library/${libraryId}/users`, {
+            params
         });
         return response.data;
     } catch (error) {
-        console.error('Error fetching library users:', error);
         throw error;
     }
 };
@@ -37,13 +34,11 @@ export const getLibraryUsers = async (libraryId, filters = {}) => {
  */
 export const getUserAnalytics = async (libraryId, userId) => {
     try {
-        const response = await axios.get(
-            `${API_BASE_URL}/library/${libraryId}/user/${userId}/analytics`,
-            { withCredentials: true }
+        const response = await axiosClient.get(
+            `/library/${libraryId}/user/${userId}/analytics`
         );
         return response.data;
     } catch (error) {
-        console.error('Error fetching user analytics:', error);
         throw error;
     }
 };
@@ -53,13 +48,11 @@ export const getUserAnalytics = async (libraryId, userId) => {
  */
 export const getLibraryStatistics = async (libraryId) => {
     try {
-        const response = await axios.get(
-            `${API_BASE_URL}/library/${libraryId}/statistics`,
-            { withCredentials: true }
+        const response = await axiosClient.get(
+            `/library/${libraryId}/statistics`
         );
         return response.data;
     } catch (error) {
-        console.error('Error fetching library statistics:', error);
         throw error;
     }
 };
@@ -147,7 +140,7 @@ export const exportAnalyticsToPDF = (analytics, libraryName) => {
 
         doc.save(`${analytics.user.name}_analytics.pdf`);
     } catch (error) {
-        console.error('Error exporting to PDF:', error);
+        console.error('PDF export requires jsPDF library:', error);
         alert('Please install jsPDF library to export to PDF: npm install jspdf');
     }
 };

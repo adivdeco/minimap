@@ -17,7 +17,7 @@ const NoticeBoard = ({ libraryId }) => {
                 const data = await getNotices(libraryId, true);
                 setNotices(data.notices);
             } catch (error) {
-                console.error("Failed to load notices", error);
+
             } finally {
                 setLoading(false);
             }

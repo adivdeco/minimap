@@ -38,7 +38,7 @@ const Login = () => {
                         navigate('/', { replace: true });
                     }
                 } catch (err) {
-                    console.error("Auth0 Backend Sync Error:", err);
+
                     setError("Failed to sync with server");
                 } finally {
                     setLoading(false);

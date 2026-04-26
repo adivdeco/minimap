@@ -63,7 +63,7 @@ const NearbyLibrariesMap = () => {
             const res = await getNearbyLibraries(lng, lat, distanceMeters);
             setLibraries(res.libraries || []);
         } catch (error) {
-            console.error("Failed to fetch nearby libraries", error);
+
         } finally {
             setFetchingLibs(false);
         }

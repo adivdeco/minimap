@@ -25,5 +25,6 @@ const subscriptionSchema = new Schema({
 
 // Check active subscriptions easily
 subscriptionSchema.index({ userId: 1, libraryId: 1, status: 1 });
+// subscriptionSchema.index({ libraryId: 1, status: 1, expiryDate: 1 }); // Performance optimization for expiry checks
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);

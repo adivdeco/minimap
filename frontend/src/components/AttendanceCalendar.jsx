@@ -34,7 +34,7 @@ const AttendanceCalendar = () => {
                 setAttendanceMap(map);
             }
         } catch (error) {
-            console.error("Failed to fetch attendance history", error);
+
         } finally {
             setLoading(false);
         }

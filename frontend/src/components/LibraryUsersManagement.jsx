@@ -77,7 +77,7 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
       const response = await axiosClient.get(`/library/${libraryId}/statistics`);
       setStatistics(response.data);
     } catch (err) {
-      console.error('Error fetching statistics:', err);
+
     }
   };
 

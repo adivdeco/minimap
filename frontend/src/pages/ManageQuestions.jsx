@@ -47,7 +47,7 @@ const ManageQuestions = () => {
             const res = await axiosClient.get(`/quizzes/${quizId}/questions`);
             setQuestions(res.data.questions || []);
         } catch (error) {
-            console.error("Failed to fetch questions", error);
+
             toast.error("Failed to load questions.");
         } finally {
             setLoading(false);
@@ -106,7 +106,7 @@ const ManageQuestions = () => {
             fetchQuestions();
             handleCloseModal();
         } catch (error) {
-            console.error("Failed to save question", error);
+
             toast.error(error.response?.data?.message || "Failed to save question.");
         }
     };
@@ -118,7 +118,7 @@ const ManageQuestions = () => {
                 toast.success("Question deleted successfully!");
                 fetchQuestions();
             } catch (error) {
-                console.error("Failed to delete question", error);
+
                 toast.error("Failed to delete question.");
             }
         }

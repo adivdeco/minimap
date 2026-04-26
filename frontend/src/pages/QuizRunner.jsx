@@ -33,7 +33,7 @@ const QuizRunner = () => {
                 const res = await axiosClient.get(`/quizzes/${id}/questions`);
                 setQuestions(res.data.questions || []);
             } catch (error) {
-                console.error("Failed to fetch questions", error);
+
                 setQuestions([]);
             } finally {
                 setIsLoadingQuestions(false);
@@ -126,7 +126,7 @@ const QuizRunner = () => {
             const res = await axiosClient.post(`/quiz-progress/${id}/submit`, { responses, timeTaken });
             setResultData(res.data);
         } catch (err) {
-            console.error('Submit error:', err);
+
             // Fallback: local scoring
             let correct = 0;
             const details = questions.map((q, i) => {

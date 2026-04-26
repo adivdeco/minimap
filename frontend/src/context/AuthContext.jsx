@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
                     const response = await googleAuth(auth0User);
                     setUser(response.user);
                 } catch (error) {
-                    console.error('Auth0 sync error:', error);
+
                 }
             }
         };
@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }) => {
                 });
             }
         } catch (error) {
-            console.error("Logout failed:", error);
+
             // Fallback: still clear local state
             setUser(null);
             localStorage.removeItem('user');
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('user');
             }
         } catch (error) {
-            console.error('Session check failed:', error);
+
         }
     };
 

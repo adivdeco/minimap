@@ -89,7 +89,7 @@ const MultiImageUpload = ({ label = "Additional Images", onChange, currentImages
             if (onChange) onChange(newImages);
 
         } catch (err) {
-            console.error(err);
+
             setError('Failed to upload some images. Please try again.');
         } finally {
             // Reset input so they can upload the exact same file again if they deleted it

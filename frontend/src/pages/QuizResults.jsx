@@ -29,7 +29,7 @@ const QuizResults = () => {
                 const attempts = progRes.data.recentAttempts || [];
                 if (attempts.length > 0) setSelectedAttempt(attempts.length - 1);
             } catch (err) {
-                console.error('Failed to fetch results', err);
+
             } finally {
                 setLoading(false);
             }

@@ -76,7 +76,7 @@ function AllUsers() {
             }
 
         } catch (error) {
-            console.error("Error fetching users:", error);
+
             toast.error("Failed to fetch users");
         } finally {
             setLoading(false);
@@ -114,7 +114,7 @@ function AllUsers() {
             setUserToDelete(null);
             toast.success("User deleted successfully");
         } catch (error) {
-            console.error("Error deleting user:", error);
+
             toast.error("Failed to delete user");
         }
     };
@@ -198,7 +198,7 @@ function AllUsers() {
             setAvatarUrl('');
 
         } catch (error) {
-            console.error("Error updating user:", error);
+
             toast.error(error.response?.data?.message || "Failed to update user");
         }
     };

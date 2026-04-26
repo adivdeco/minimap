@@ -8,7 +8,7 @@ import {
     TrendingUp, Users, DollarSign, Calendar, 
     Clock, Award, LayoutDashboard, Download
 } from 'lucide-react';
-import axios from 'axios';
+import axiosClient from '../../api/axiosClient';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../LoadingSpinner';
 import { motion } from 'framer-motion';
@@ -25,30 +25,26 @@ const AdminAnalytics = ({ libraryId }) => {
             setLoading(true);
             try {
                 // Fetch basic stats
-                const statsRes = await axios.get(`${import.meta.env.VITE_API_URL}/library/${libraryId}/statistics`, {
-                    withCredentials: true
-                });
+                const statsRes = await axiosClient.get(`/library/${libraryId}/statistics`);
                 setStats(statsRes.data);
 
                 // Fetch attendance chart (current month)
                 const now = new Date();
-                const chartRes = await axios.get(`${import.meta.env.VITE_API_URL}/library/${libraryId}/attendance-chart`, {
-                    params: { month: now.getMonth() + 1, year: now.getFullYear() },
-                    withCredentials: true
+                const chartRes = await axiosClient.get(`/library/${libraryId}/attendance-chart`, {
+                    params: { month: now.getMonth() + 1, year: now.getFullYear() }
                 });
                 setAttendanceChart(chartRes.data.chartData);
 
                 // Fetch shift analytics (for today)
                 // Use local date string (YYYY-MM-DD) to match backend Asia/Kolkata logic
                 const todayStr = now.toLocaleDateString('en-CA'); 
-                const shiftRes = await axios.get(`${import.meta.env.VITE_API_URL}/library/${libraryId}/attendance-shifts`, {
-                    params: { date: todayStr },
-                    withCredentials: true
+                const shiftRes = await axiosClient.get(`/library/${libraryId}/attendance-shifts`, {
+                    params: { date: todayStr }
                 });
                 setShiftData(shiftRes.data.chartData);
 
             } catch (error) {
-                console.error("Failed to load analytics:", error);
+
                 toast.error("Some analytics data failed to load");
             } finally {
                 setLoading(false);

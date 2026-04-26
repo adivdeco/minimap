@@ -59,7 +59,7 @@ export function AttendanceChart() {
           setChartData(processedData)
         }
       } catch (error) {
-        console.error("Failed to fetch attendance for chart", error)
+
       } finally {
         setLoading(false)
       }

@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
+const compression = require('compression');
 // Load env vars
 dotenv.config();
 
@@ -31,6 +32,7 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 
 // Middleware
 app.use(helmet());
+app.use(compression());
 app.use(
     helmet.contentSecurityPolicy({
         directives: {

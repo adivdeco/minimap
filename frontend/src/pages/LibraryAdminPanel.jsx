@@ -11,7 +11,7 @@ import { toast } from 'react-toastify';
 import { Settings, Users, DollarSign, ArrowLeft, BellRing, LayoutDashboard, ChevronLeft } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 
 const LibraryAdminPanel = () => {
     const { id: libraryId } = useParams();
@@ -38,12 +38,10 @@ const LibraryAdminPanel = () => {
     const fetchStats = async () => {
         setStatsLoading(true);
         try {
-            const response = await axios.get(`${import.meta.env.VITE_API_URL}/library/${libraryId}/statistics`, {
-                withCredentials: true
-            });
+            const response = await axiosClient.get(`/library/${libraryId}/statistics`);
             setLibStats(response.data);
         } catch (error) {
-            console.error("Error fetching occupancy:", error);
+
         } finally {
             setStatsLoading(false);
         }

@@ -10,9 +10,7 @@ import {
     Grid3X3
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api';
+import axiosClient from '../api/axiosClient';
 
 // --- SUB-COMPONENT: DRAGGABLE SEAT ---
 const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, scale }) => {
@@ -127,13 +125,13 @@ const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditM
                 };
             });
 
-            await axios.put(`${API_URL}/seats/positions`, { positions: updates }, { withCredentials: true });
+            await axiosClient.put('/seats/positions', { positions: updates });
             toast.success("Layout saved successfully!");
             setIsEditMode(false);
             setPositions({}); // Clear local state after save
             refreshSeats();
         } catch (err) {
-            console.error("Save failed", err);
+
             toast.error("Failed to save layout");
         } finally {
             setSaving(false);

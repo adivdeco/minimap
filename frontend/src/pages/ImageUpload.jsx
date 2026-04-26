@@ -105,7 +105,7 @@ const ImageUpload = ({ label = "Image", onUploadSuccess, onAvatarUpdate, current
                 onUploadSuccess({ url: secureUrl });
             }
         } catch (err) {
-            console.error(err);
+
             setError('Failed to upload image. Please try again.');
         } finally {
             setUploading(false);

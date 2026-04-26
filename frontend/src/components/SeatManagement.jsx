@@ -22,7 +22,7 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
       const data = await getLibrarySeats(libraryId);
       setSeats(data);
     } catch (err) {
-      console.error("Failed to fetch seats", err);
+
       toast.error("Failed to load seat map");
     } finally {
       setLoading(false);
@@ -36,7 +36,7 @@ const SeatManagement = ({ libraryId, userRole, isOwner }) => { // Assuming props
       // Adapt based on backend response structure (might be response.data or response.data.users)
       setUsers(response.data.users || response.data || []);
     } catch (err) {
-      console.error("Failed to fetch library users for reservation logic", err);
+
     }
   };
 
