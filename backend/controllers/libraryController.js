@@ -10,8 +10,8 @@ const Attendance = require('../models/Attendance');
 // @route   POST /api/library/add
 const addLibrary = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
 
         // Only admin or co-admin can add libraries
         if (role !== 'co-admin' && role !== 'admin') {
@@ -200,8 +200,8 @@ const addLibrary = async (req, res) => {
 // @route   PUT /api/library/update/:id
 const updateLibrary = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { id } = req.params;
 
         // Find the library
@@ -305,8 +305,9 @@ const getAllLibraries = async (req, res) => {
         // Build filter query
         const filter = {};
 
-        if (city) filter['location.address.city'] = new RegExp(city, 'i');
-        if (state) filter['location.address.state'] = new RegExp(state, 'i');
+        const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (city) filter['location.address.city'] = new RegExp(escapeRegex(city), 'i');
+        if (state) filter['location.address.state'] = new RegExp(escapeRegex(state), 'i');
         if (isActive !== undefined) filter.isActive = isActive === 'true';
         if (isVerified !== undefined) filter.isVerified = isVerified === 'true';
         if (minRating) filter['rating.average'] = { $gte: parseFloat(minRating) };
@@ -381,7 +382,7 @@ const getLibraryById = async (req, res) => {
 // @route   GET /api/library/my-libraries
 const getMyLibraries = async (req, res) => {
     try {
-        const userId = req.finduser._id;
+        const userId = req.user._id;
 
         const libraries = await Library.find({ ownerId: userId })
             .sort({ createdAt: -1 });
@@ -444,8 +445,8 @@ const getNearbyLibraries = async (req, res) => {
 // @route   DELETE /api/library/delete/:id
 const deleteLibrary = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { id } = req.params;
 
         // Find the library
@@ -477,7 +478,7 @@ const deleteLibrary = async (req, res) => {
         const remainingLibraries = await Library.countDocuments({ ownerId });
         if (remainingLibraries === 0) {
             await User.findByIdAndUpdate(ownerId, {
-                $set: { role: 'student' }
+                $set: { role: 'User' }
             });
         }
 
@@ -499,8 +500,8 @@ const deleteLibrary = async (req, res) => {
 // @route   PATCH /api/library/toggle-status/:id
 const toggleLibraryStatus = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { id } = req.params;
 
         const library = await Library.findById(id);
@@ -534,7 +535,7 @@ const toggleLibraryStatus = async (req, res) => {
 // @route   POST /api/library/rate/:id
 const rateLibrary = async (req, res) => {
     try {
-        const userId = req.finduser._id;
+        const userId = req.user._id;
         const { id } = req.params;
         const { rating, comment } = req.body;
 
@@ -592,8 +593,8 @@ const rateLibrary = async (req, res) => {
 // @route   DELETE /api/library/review/:libraryId/:reviewId
 const deleteReview = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const userRole = req.finduser.role;
+        const userId = req.user._id;
+        const userRole = req.user.role;
         const { libraryId, reviewId } = req.params;
 
         const library = await Library.findById(libraryId);
@@ -644,8 +645,8 @@ const deleteReview = async (req, res) => {
 // @route   PATCH /api/library/regenerate-qr/:id
 const regenerateQRCode = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const userRole = req.finduser.role;
+        const userId = req.user._id;
+        const userRole = req.user.role;
         const { id } = req.params;
 
         const library = await Library.findById(id);
@@ -781,8 +782,8 @@ const generateSeatsForLibrary = async (req, res) => {
 
 const getLibraryUsers = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { libraryId } = req.params;
 
         // Find the library
@@ -846,7 +847,8 @@ const getLibraryUsers = async (req, res) => {
         let userIds = validSubscriptions.map(sub => sub.userId._id);
 
         if (searchQuery) {
-            const searchFilter = new RegExp(searchQuery, 'i');
+            const escapeRgx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const searchFilter = new RegExp(escapeRgx(searchQuery), 'i');
             const filteredSubs = validSubscriptions.filter(sub =>
                 searchFilter.test(sub.userId.name) ||
                 searchFilter.test(sub.userId.email)
@@ -1030,8 +1032,8 @@ const getLibraryUsers = async (req, res) => {
 // @route   GET /api/library/:libraryId/user/:userId/analytics
 const getUserAnalytics = async (req, res) => {
     try {
-        const ownerId = req.finduser._id;
-        const ownerRole = req.finduser.role;
+        const ownerId = req.user._id;
+        const ownerRole = req.user.role;
         const { libraryId, userId } = req.params;
 
         // Verify library ownership
@@ -1184,8 +1186,8 @@ const getUserAnalytics = async (req, res) => {
 // @route   GET /api/library/:libraryId/statistics
 const getLibraryStatistics = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { libraryId } = req.params;
 
         const library = await Library.findById(libraryId);
@@ -1338,8 +1340,8 @@ const getLibraryStatistics = async (req, res) => {
 // @route   PUT /api/library/:libraryId/user/:userId/contact
 const updateUserContactInfo = async (req, res) => {
     try {
-        const ownerId = req.finduser._id;
-        const ownerRole = req.finduser.role;
+        const ownerId = req.user._id;
+        const ownerRole = req.user.role;
         const { libraryId, userId } = req.params;
         const { phone } = req.body;
 
@@ -1383,8 +1385,8 @@ const updateUserContactInfo = async (req, res) => {
 // @route   GET /api/library/:libraryId/attendance-chart
 const getLibraryAttendanceChart = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { libraryId } = req.params;
         const { month, year } = req.query;
 
@@ -1468,8 +1470,8 @@ const getLibraryAttendanceChart = async (req, res) => {
 // @route   GET /api/library/:libraryId/attendance-shifts
 const getLibraryShiftAnalytics = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { libraryId } = req.params;
         const { date } = req.query; // YYYY-MM-DD format
 
@@ -1561,8 +1563,8 @@ const getLibraryShiftAnalytics = async (req, res) => {
 // @route   GET /api/library/:libraryId/attendance-day-details
 const getLibraryAttendanceDayDetails = async (req, res) => {
     try {
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
         const { libraryId } = req.params;
         const { date } = req.query; // YYYY-MM-DD
 

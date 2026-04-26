@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { getStoredUser, logout as apiLogout, googleAuth, checkSession } from '../api/auth';
+import { logout as apiLogout, googleAuth, checkSession } from '../api/auth';
 
 const AuthContext = createContext(null);
 
@@ -22,23 +22,11 @@ export const AuthProvider = ({ children }) => {
                 if (response.user) {
                     setUser(response.user);
                     localStorage.setItem('user', JSON.stringify(response.user));
+                } else {
+                    localStorage.removeItem('user');
                 }
-            } catch (error) {
-                // No valid session, check localStorage
-                const storedUser = getStoredUser();
-                if (storedUser) {
-                    // Verify if session is still valid
-                    try {
-                        const response = await checkSession();
-                        if (response.user) {
-                            setUser(response.user);
-                        } else {
-                            localStorage.removeItem('user');
-                        }
-                    } catch {
-                        localStorage.removeItem('user');
-                    }
-                }
+            } catch {
+                localStorage.removeItem('user');
             } finally {
                 setLoading(false);
             }

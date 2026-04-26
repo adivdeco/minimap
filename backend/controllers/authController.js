@@ -7,8 +7,9 @@ const jwt = require('jsonwebtoken');
 const { sendVerificationEmail } = require('../utils/emailService');
 const crypto = require('crypto');
 
-const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
-const JWT_EXPIRY = 60 * 60 * 24 * 7; // ~16 days
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error("FATAL: JWT_SECRET environment variable is not set. Server cannot start.");
+const JWT_EXPIRY = 60 * 60 * 24 * 7; // 7 days
 
 // Cookie options
 const getCookieOptions = () => {
@@ -21,7 +22,7 @@ const getCookieOptions = () => {
         path: '/'
     };
 };
-[]
+
 // @desc    Register new user
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
@@ -403,7 +404,7 @@ const checkSession = async (req, res) => {
 // @route   GET /api/auth/users
 const allUsers = async (req, res) => {
     try {
-        const role = req.finduser.role;
+        const role = req.user.role;
 
         if (role !== 'co-admin' && role !== 'admin') {
             return res.status(403).json({
@@ -419,9 +420,11 @@ const allUsers = async (req, res) => {
         const filter = {};
         if (req.query.role) filter.role = req.query.role;
         if (req.query.search) {
+            const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const safePattern = new RegExp(escapeRegex(req.query.search), 'i');
             filter.$or = [
-                { name: new RegExp(req.query.search, 'i') },
-                { email: new RegExp(req.query.search, 'i') }
+                { name: safePattern },
+                { email: safePattern }
             ];
         }
 
@@ -456,7 +459,7 @@ const allUsers = async (req, res) => {
 // @route   PUT /api/auth/users/:id
 const updateUser = async (req, res) => {
     try {
-        const role = req.finduser.role;
+        const role = req.user.role;
 
         if (role !== 'co-admin' && role !== 'admin') {
             return res.status(403).json({
@@ -468,7 +471,7 @@ const updateUser = async (req, res) => {
         const updateData = req.body;
 
         // Only admin can change roles
-        if (updateData.role && req.finduser.role !== 'admin') {
+        if (updateData.role && req.user.role !== 'admin') {
             return res.status(403).json({
                 message: 'Forbidden: Only admin can change user roles'
             });
@@ -519,7 +522,7 @@ const updateUser = async (req, res) => {
 // @route   DELETE /api/auth/users/:id
 const deleteUser = async (req, res) => {
     try {
-        const role = req.finduser.role;
+        const role = req.user.role;
 
         if (role !== 'co-admin' && role !== 'admin') {
             return res.status(403).json({
@@ -530,7 +533,7 @@ const deleteUser = async (req, res) => {
         const { id } = req.params;
 
         // Prevent deleting yourself
-        if (id === req.finduser._id.toString()) {
+        if (id === req.user._id.toString()) {
             return res.status(400).json({ message: "You cannot delete your own account" });
         }
 
@@ -540,7 +543,7 @@ const deleteUser = async (req, res) => {
         }
 
         // Only admin can delete other admins
-        if (user.role === 'admin' && req.finduser.role !== 'admin') {
+        if (user.role === 'admin' && req.user.role !== 'admin') {
             return res.status(403).json({ message: "Forbidden: Only admin can delete admin accounts" });
         }
 
@@ -566,7 +569,7 @@ const deleteUser = async (req, res) => {
 // @route   PUT /api/auth/profile
 const updateProfile = async (req, res) => {
     try {
-        const userId = req.finduser._id;
+        const userId = req.user._id;
         const updateData = req.body;
 
         // Fields that users can update themselves
@@ -600,7 +603,7 @@ const updateProfile = async (req, res) => {
 // @route   PUT /api/auth/change-password
 const changePassword = async (req, res) => {
     try {
-        const userId = req.finduser._id;
+        const userId = req.user._id;
         const { currentPassword, newPassword } = req.body;
 
         if (!currentPassword || !newPassword) {

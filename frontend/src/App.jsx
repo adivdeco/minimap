@@ -24,9 +24,9 @@ const ManageQuestions = lazy(() => import('./pages/ManageQuestions'));
 
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Quizzes from './pages/Quizzes';
-import QuizRunner from './pages/QuizRunner';
-import QuizResults from './pages/QuizResults';
+const Quizzes = lazy(() => import('./pages/Quizzes'));
+const QuizRunner = lazy(() => import('./pages/QuizRunner'));
+const QuizResults = lazy(() => import('./pages/QuizResults'));
 
 function App() {
   return (

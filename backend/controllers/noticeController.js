@@ -7,8 +7,8 @@ const Library = require('../models/LibrarySchema');
 exports.createNotice = async (req, res) => {
     try {
         const { libraryId, title, message, priority, isActive } = req.body;
-        const adminId = req.finduser._id;
-        const adminRole = req.finduser.role;
+        const adminId = req.user._id;
+        const adminRole = req.user.role;
 
         // Validation
         if (!libraryId || !title || !message) {
@@ -83,8 +83,8 @@ exports.getLibraryNotices = async (req, res) => {
 exports.updateNotice = async (req, res) => {
     try {
         const noticeId = req.params.id;
-        const adminId = req.finduser._id;
-        const adminRole = req.finduser.role;
+        const adminId = req.user._id;
+        const adminRole = req.user.role;
 
         const notice = await Notice.findById(noticeId);
         if (!notice) {
@@ -125,8 +125,8 @@ exports.updateNotice = async (req, res) => {
 exports.deleteNotice = async (req, res) => {
     try {
         const noticeId = req.params.id;
-        const adminId = req.finduser._id;
-        const adminRole = req.finduser.role;
+        const adminId = req.user._id;
+        const adminRole = req.user.role;
 
         const notice = await Notice.findById(noticeId);
         if (!notice) {

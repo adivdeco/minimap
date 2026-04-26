@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Plus, Edit2, Trash2, X, CheckCircle2, Database } from 'lucide-react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
@@ -29,7 +29,6 @@ const ManageQuestions = () => {
         explanation: ''
     });
 
-    const API_URL = import.meta.env.VITE_API_URL;
 
     useEffect(() => {
         if (!authLoading && !canManageQuizzes) {
@@ -45,7 +44,7 @@ const ManageQuestions = () => {
     const fetchQuestions = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`${API_URL}/quizzes/${quizId}/questions`, { withCredentials: true });
+            const res = await axiosClient.get(`/quizzes/${quizId}/questions`);
             setQuestions(res.data.questions || []);
         } catch (error) {
             console.error("Failed to fetch questions", error);
@@ -97,11 +96,11 @@ const ManageQuestions = () => {
         try {
             if (editingId) {
                 // Update existing question
-                await axios.put(`${API_URL}/questions/${editingId}`, formData, { withCredentials: true });
+                await axiosClient.put(`/questions/${editingId}`, formData);
                 toast.success("Question updated successfully!");
             } else {
                 // Add new question
-                await axios.post(`${API_URL}/quizzes/${quizId}/questions`, formData, { withCredentials: true });
+                await axiosClient.post(`/quizzes/${quizId}/questions`, formData);
                 toast.success("Question added successfully!");
             }
             fetchQuestions();
@@ -115,7 +114,7 @@ const ManageQuestions = () => {
     const handleDeleteQuestion = async (questionId) => {
         if (window.confirm("Are you sure you want to delete this question?")) {
             try {
-                await axios.delete(`${API_URL}/questions/${questionId}`, { withCredentials: true });
+                await axiosClient.delete(`/questions/${questionId}`);
                 toast.success("Question deleted successfully!");
                 fetchQuestions();
             } catch (error) {

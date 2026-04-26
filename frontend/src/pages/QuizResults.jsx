@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Trophy, Clock, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp, Target } from 'lucide-react';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 
 const QuizResults = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     const quiz = location.state?.quiz || { title: 'Assessment', questions: 0 };
-    const API_URL = import.meta.env.VITE_API_URL;
 
     const [progress, setProgress] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -21,8 +20,8 @@ const QuizResults = () => {
         const fetchData = async () => {
             try {
                 const [progRes, qRes] = await Promise.all([
-                    axios.get(`${API_URL}/quiz-progress/${id}`, { withCredentials: true }),
-                    axios.get(`${API_URL}/quizzes/${id}/questions`, { withCredentials: true })
+                    axiosClient.get(`/quiz-progress/${id}`),
+                    axiosClient.get(`/quizzes/${id}/questions`)
                 ]);
                 setProgress(progRes.data);
                 setQuestions(qRes.data.questions || []);
@@ -36,7 +35,7 @@ const QuizResults = () => {
             }
         };
         fetchData();
-    }, [id, API_URL]);
+    }, [id]);
 
     const fmtTime = (s) => s ? `${Math.floor(s / 60)}m ${s % 60}s` : '—';
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';

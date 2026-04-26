@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Plan = require('../models/Plan');
 const authMiddleware = require('../middleware/authMiddleware');
 const mongoose = require('mongoose');
+const AppError = require('../utils/AppError');
 
 // --- CONFIGURATION ---
 const MAX_DAILY_CHECKINS = 3;
@@ -40,119 +41,27 @@ async function resolvePlan(planId, library) {
     return plan;
 }
 
-// ==========================================
-// 1. CORE LOGIC: ASSIGN SEAT (Pure Function)
-// ==========================================
-/**
- * Executes the database writes to assign a seat.
- * Throws Errors with prefixes (e.g., "LIMIT:", "FULL:") for the controller to handle.
- */
-async function assignSeat(library, userId, subscription, dailyStats, session) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // 1. Get Plan Limits
-    const planDoc = await resolvePlan(subscription.planId, library);
-    let hoursPerDay = (planDoc && planDoc.hoursPerDay) ? planDoc.hoursPerDay : 5;
-
-    // 2. Calculate Remaining Time
-    const maxMinutes = hoursPerDay * 60;
-    const usedMinutes = dailyStats.minutesUsed;
-    let remainingMinutes = maxMinutes - usedMinutes;
-
-    if (remainingMinutes <= 0) {
-        throw new Error(`LIMIT: Daily Quota Exceeded! You used ${Math.floor(usedMinutes / 60)}h ${usedMinutes % 60}m of your ${hoursPerDay}h limit.`);
+// --- HELPER: Centralized catch handler for AppError ---
+function handleAppError(err, res, fallbackMsg = 'Server Error') {
+    if (err instanceof AppError) {
+        return res.status(err.statusCode).json({ success: false, msg: err.message });
     }
-
-    const expectedEndTime = new Date(Date.now() + remainingMinutes * 60000);
-
-    // 3. Find an Available Seat
-    // Note: We only pick 'Available' seats. 'Reserved' seats are explicitly excluded here.
-    const randomSeatResult = await Seat.aggregate([
-        { $match: { libraryId: library._id, status: 'Available' } },
-        { $sample: { size: 1 } }
-    ]).session(session);
-
-    if (!randomSeatResult || randomSeatResult.length === 0) {
-        throw new Error("FULL: Library is full! No seats available.");
-    }
-
-    const selectedSeat = randomSeatResult[0];
-
-    // 4. Lock the Seat (Atomic Write)
-    const availableSeat = await Seat.findOneAndUpdate(
-        { _id: selectedSeat._id, status: 'Available' },
-        {
-            status: 'Occupied',
-            currentOccupant: userId,
-            occupiedSince: new Date(),
-            expectedEndTime: expectedEndTime
-        },
-        { new: true, session: session }
-    );
-
-    if (!availableSeat) {
-        throw new Error("RACE: Seat was taken just before you confirmed. Please try again.");
-    }
-
-    // 5. Update Attendance Bucket
-    const attendanceDoc = await Attendance.findOneAndUpdate(
-        { userId, libraryId: library._id, date: today },
-        {
-            $push: {
-                sessions: {
-                    seatNumber: availableSeat.seatNumber,
-                    checkInTime: new Date(),
-                    checkOutTime: null,
-                    durationMinutes: 0
-                }
-            },
-            $inc: { sessionCount: 1 }
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true, session: session }
-    );
-
-    // 6. Update User Context
-    await User.findByIdAndUpdate(userId, {
-        $set: {
-            'studentDetails.assignedSeat': {
-                seatId: availableSeat._id,
-                seatNumber: availableSeat.seatNumber,
-                checkInTime: new Date(),
-                expectedEndTime: expectedEndTime
-            },
-            'studentDetails.currentSubscription': {
-                subscriptionId: subscription._id,
-                libraryId: library._id,
-                planId: subscription.planId,
-                startDate: subscription.startDate,
-                expiryDate: subscription.expiryDate,
-                status: 'active'
-            },
-            $addToSet: { attendanceHistory: attendanceDoc._id }
-        }
-    }, { session: session });
-
-    // 7. Side Effect: Invalidate Cache (Safe to do before commit in this context)
-    authMiddleware.invalidateUserCache(userId);
-
-    // 8. Return Success Data
-    const rHours = Math.floor(remainingMinutes / 60);
-    const rMins = Math.floor(remainingMinutes % 60);
-
-    return {
-        seat: availableSeat.seatNumber,
-        checkinsRemaining: MAX_DAILY_CHECKINS - (dailyStats.sessionsCount + 1),
-        maxDailyCheckins: MAX_DAILY_CHECKINS,
-        remainingTime: { hours: rHours, minutes: rMins },
-        msg: `Checked In! Assigned Seat: ${availableSeat.seatNumber}`
-    };
+    res.status(500).json({ success: false, msg: fallbackMsg });
 }
 
 // ==========================================
-// 1B. CORE LOGIC: ASSIGN RESERVED SEAT 
+// 1. CORE LOGIC: ASSIGN SEAT (Unified)
 // ==========================================
-async function assignReservedSeat(reservedSeatDoc, library, userId, subscription, dailyStats, session) {
+/**
+ * Assigns a seat to a user — either a specific reserved seat or a random available one.
+ * @param {Object}  library        - Library document
+ * @param {ObjectId} userId        - User being seated
+ * @param {Object}  subscription   - Active subscription doc
+ * @param {Object}  dailyStats     - { minutesUsed, sessionsCount }
+ * @param {Object}  session        - Mongoose transaction session
+ * @param {Object}  [reservedSeatDoc=null] - If provided, assigns this reserved seat instead of a random one
+ */
+async function assignSeat(library, userId, subscription, dailyStats, session, reservedSeatDoc = null) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -166,25 +75,56 @@ async function assignReservedSeat(reservedSeatDoc, library, userId, subscription
     let remainingMinutes = maxMinutes - usedMinutes;
 
     if (remainingMinutes <= 0) {
-        throw new Error(`LIMIT: Daily Quota Exceeded! You used ${Math.floor(usedMinutes / 60)}h ${usedMinutes % 60}m of your ${hoursPerDay}h limit.`);
+        throw new AppError(
+            `Daily Quota Exceeded! You used ${Math.floor(usedMinutes / 60)}h ${usedMinutes % 60}m of your ${hoursPerDay}h limit.`,
+            403, 'LIMIT'
+        );
     }
 
     const expectedEndTime = new Date(Date.now() + remainingMinutes * 60000);
 
-    // 3. Lock the Reserved Seat (Atomic Write)
-    const seat = await Seat.findOneAndUpdate(
-        { _id: reservedSeatDoc._id, status: 'Reserved' },
-        {
-            status: 'Occupied',
-            currentOccupant: userId,
-            occupiedSince: new Date(),
-            expectedEndTime: expectedEndTime
-        },
-        { new: true, session: session }
-    );
+    // 3. Acquire Seat — reserved path vs random path
+    let seat;
+    if (reservedSeatDoc) {
+        // Lock the specific reserved seat
+        seat = await Seat.findOneAndUpdate(
+            { _id: reservedSeatDoc._id, status: 'Reserved' },
+            {
+                status: 'Occupied',
+                currentOccupant: userId,
+                occupiedSince: new Date(),
+                expectedEndTime: expectedEndTime
+            },
+            { new: true, session }
+        );
+        if (!seat) {
+            throw new AppError('Could not claim reserved seat. It might no longer be reserved.', 409, 'RACE');
+        }
+    } else {
+        // Find a random available seat
+        const randomSeatResult = await Seat.aggregate([
+            { $match: { libraryId: library._id, status: 'Available' } },
+            { $sample: { size: 1 } }
+        ]).session(session);
 
-    if (!seat) {
-        throw new Error("RACE: Could not claim reserved seat. It might no longer be reserved.");
+        if (!randomSeatResult || randomSeatResult.length === 0) {
+            throw new AppError('Library is full! No seats available.', 400, 'FULL');
+        }
+
+        // Lock it atomically
+        seat = await Seat.findOneAndUpdate(
+            { _id: randomSeatResult[0]._id, status: 'Available' },
+            {
+                status: 'Occupied',
+                currentOccupant: userId,
+                occupiedSince: new Date(),
+                expectedEndTime: expectedEndTime
+            },
+            { new: true, session }
+        );
+        if (!seat) {
+            throw new AppError('Seat was taken just before you confirmed. Please try again.', 409, 'RACE');
+        }
     }
 
     // 4. Update Attendance Bucket
@@ -201,7 +141,7 @@ async function assignReservedSeat(reservedSeatDoc, library, userId, subscription
             },
             $inc: { sessionCount: 1 }
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true, session: session }
+        { upsert: true, new: true, setDefaultsOnInsert: true, session }
     );
 
     // 5. Update User Context
@@ -223,7 +163,7 @@ async function assignReservedSeat(reservedSeatDoc, library, userId, subscription
             },
             $addToSet: { attendanceHistory: attendanceDoc._id }
         }
-    }, { session: session });
+    }, { session });
 
     // 6. Side Effect: Invalidate Cache
     authMiddleware.invalidateUserCache(userId);
@@ -231,13 +171,16 @@ async function assignReservedSeat(reservedSeatDoc, library, userId, subscription
     // 7. Return Success Data
     const rHours = Math.floor(remainingMinutes / 60);
     const rMins = Math.floor(remainingMinutes % 60);
+    const isReserved = !!reservedSeatDoc;
 
     return {
         seat: seat.seatNumber,
         checkinsRemaining: MAX_DAILY_CHECKINS - (dailyStats.sessionsCount + 1),
         maxDailyCheckins: MAX_DAILY_CHECKINS,
         remainingTime: { hours: rHours, minutes: rMins },
-        msg: `Checked In to your Reserved Seat: ${seat.seatNumber}`
+        msg: isReserved
+            ? `Checked In to your Reserved Seat: ${seat.seatNumber}`
+            : `Checked In! Assigned Seat: ${seat.seatNumber}`
     };
 }
 
@@ -250,20 +193,20 @@ exports.checkIn = async (req, res) => {
 
     try {
         const { qrCodeString } = req.body;
-        const userId = req.finduser._id;
+        const userId = req.user._id;
 
         // 1. Identify Library
         const library = await Library.findOne({ 'accessConfig.qrCodeData': qrCodeString }).session(session);
-        if (!library) throw new Error("NOT_FOUND: Invalid QR Code");
+        if (!library) throw new AppError('Invalid QR Code', 404, 'NOT_FOUND');
 
         // 2. Prevent Double Entry
         const existingSeat = await Seat.findOne({ currentOccupant: userId }).session(session);
-        if (existingSeat) throw new Error(`BAD_REQUEST: You are already seated at ${existingSeat.seatNumber}.`);
+        if (existingSeat) throw new AppError(`You are already seated at ${existingSeat.seatNumber}.`, 400, 'BAD_REQUEST');
 
         // 3. Security Check: Daily Limits
         const dailyStats = await getDailyStats(userId, library._id, session);
         if (dailyStats.sessionsCount >= MAX_DAILY_CHECKINS) {
-            throw new Error(`LIMIT: Daily entry limit reached (${MAX_DAILY_CHECKINS} times/day).`);
+            throw new AppError(`Daily entry limit reached (${MAX_DAILY_CHECKINS} times/day).`, 403, 'LIMIT');
         }
 
         // 4. Check Subscription
@@ -327,7 +270,7 @@ exports.checkIn = async (req, res) => {
 
             let resultData;
             if (isReservedForNow) {
-                resultData = await assignReservedSeat(userReservedSeat, library, userId, activeSub, dailyStats, session);
+                resultData = await assignSeat(library, userId, activeSub, dailyStats, session, userReservedSeat);
             } else {
                 resultData = await assignSeat(library, userId, activeSub, dailyStats, session);
             }
@@ -375,14 +318,7 @@ exports.checkIn = async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         console.error("CheckIn Transaction Failed:", err.message);
-
-        if (err.message.startsWith("LIMIT:")) return res.status(403).json({ success: false, msg: err.message.split(': ')[1] });
-        if (err.message.startsWith("FULL:")) return res.status(400).json({ success: false, msg: err.message.split(': ')[1] });
-        if (err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ success: false, msg: err.message.split(': ')[1] });
-        if (err.message.startsWith("NOT_FOUND:")) return res.status(404).json({ success: false, msg: err.message.split(': ')[1] });
-        if (err.message.startsWith("RACE:")) return res.status(409).json({ success: false, msg: err.message.split(': ')[1] });
-
-        res.status(500).json({ success: false, msg: "Server Error during Check-in" });
+        handleAppError(err, res, 'Server Error during Check-in');
     } finally {
         session.endSession();
     }
@@ -397,16 +333,16 @@ exports.activateTrial = async (req, res) => {
 
     try {
         const { libraryId, planId } = req.body;
-        const userId = req.finduser._id;
+        const userId = req.user._id;
 
         const history = await Subscription.exists({ userId, libraryId }).session(session);
-        if (history) throw new Error("BAD_REQUEST: Trial already used.");
+        if (history) throw new AppError('Trial already used.', 400, 'BAD_REQUEST');
 
         const library = await Library.findById(libraryId).session(session);
-        if (!library) throw new Error("NOT_FOUND: Library not found");
+        if (!library) throw new AppError('Library not found', 404, 'NOT_FOUND');
 
         const plan = await resolvePlan(planId, library);
-        if (!plan || !plan.trialDays || plan.trialDays <= 0) throw new Error("BAD_REQUEST: Invalid Trial Plan");
+        if (!plan || !plan.trialDays || plan.trialDays <= 0) throw new AppError('Invalid Trial Plan', 400, 'BAD_REQUEST');
 
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + plan.trialDays);
@@ -432,11 +368,7 @@ exports.activateTrial = async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         console.error("Activate Trial Error:", err.message);
-
-        if (err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ msg: err.message.split(': ')[1] });
-        if (err.message.startsWith("NOT_FOUND:")) return res.status(404).json({ msg: err.message.split(': ')[1] });
-
-        res.status(500).json({ msg: "Failed to activate trial" });
+        handleAppError(err, res, 'Failed to activate trial');
     } finally {
         session.endSession();
     }
@@ -450,11 +382,11 @@ exports.checkOut = async (req, res) => {
     session.startTransaction();
 
     try {
-        const userId = req.finduser._id;
+        const userId = req.user._id;
 
         // 1. Get current seat
         const seat = await Seat.findOne({ currentOccupant: userId }).session(session);
-        if (!seat) throw new Error("BAD_REQUEST: You are not currently checked in.");
+        if (!seat) throw new AppError('You are not currently checked in.', 400, 'BAD_REQUEST');
 
         const checkOutTime = new Date();
 
@@ -540,8 +472,7 @@ exports.checkOut = async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         console.error("CheckOut Error:", err);
-        if (err.message.startsWith("BAD_REQUEST:")) return res.status(400).json({ msg: err.message.split(': ')[1] });
-        res.status(500).json({ msg: "Server Error during checkout" });
+        handleAppError(err, res, 'Server Error during checkout');
     } finally {
         session.endSession();
     }
@@ -556,24 +487,24 @@ exports.activateSubscriptionOffline = async (req, res) => {
 
     try {
         const { userId, libraryId, planId, pricePaid, startDate, endDate } = req.body;
-        const adminId = req.finduser._id;
-        const adminRole = req.finduser.role;
+        const adminId = req.user._id;
+        const adminRole = req.user.role;
 
-        if (!userId || !libraryId || !planId) throw new Error("BAD_REQUEST: Missing required fields");
+        if (!userId || !libraryId || !planId) throw new AppError('Missing required fields', 400, 'BAD_REQUEST');
 
         const library = await Library.findById(libraryId).session(session);
-        if (!library) throw new Error("NOT_FOUND: Library not found");
+        if (!library) throw new AppError('Library not found', 404, 'NOT_FOUND');
 
         const isAdmin = adminRole === 'admin' || adminRole === 'co-admin';
         const isLibraryOwner = adminRole === 'library_owner' && library.ownerId.toString() === adminId.toString();
 
-        if (!isAdmin && !isLibraryOwner) throw new Error("FORBIDDEN: Unauthorized");
+        if (!isAdmin && !isLibraryOwner) throw new AppError('Unauthorized', 403, 'FORBIDDEN');
 
         const user = await User.findById(userId).session(session);
-        if (!user) throw new Error("NOT_FOUND: User not found");
+        if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
 
         const plan = await resolvePlan(planId, library);
-        if (!plan) throw new Error("NOT_FOUND: Plan not found");
+        if (!plan) throw new AppError('Plan not found', 404, 'NOT_FOUND');
 
         const existingActiveSub = await Subscription.findOne({
             userId,
@@ -582,7 +513,7 @@ exports.activateSubscriptionOffline = async (req, res) => {
             expiryDate: { $gt: new Date() }
         }).session(session);
 
-        if (existingActiveSub) throw new Error("BAD_REQUEST: User already has an active subscription");
+        if (existingActiveSub) throw new AppError('User already has an active subscription', 400, 'BAD_REQUEST');
 
         // --- GRACE PERIOD DEDUCTION ---
         const graceSub = await Subscription.findOne({
@@ -661,14 +592,7 @@ exports.activateSubscriptionOffline = async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         console.error("Offline Sub Error:", err);
-        const code = err.message.split(':')[0];
-        const msg = err.message.split(': ')[1] || "Failed";
-
-        if (code === "BAD_REQUEST") return res.status(400).json({ success: false, msg });
-        if (code === "NOT_FOUND") return res.status(404).json({ success: false, msg });
-        if (code === "FORBIDDEN") return res.status(403).json({ success: false, msg });
-
-        res.status(500).json({ success: false, msg: "Failed to activate subscription" });
+        handleAppError(err, res, 'Failed to activate subscription');
     } finally {
         session.endSession();
     }
@@ -683,21 +607,21 @@ exports.deleteSubscription = async (req, res) => {
 
     try {
         const { libraryId, subscriptionId } = req.params;
-        const adminId = req.finduser._id;
-        const adminRole = req.finduser.role;
+        const adminId = req.user._id;
+        const adminRole = req.user.role;
 
         const library = await Library.findById(libraryId).session(session);
-        if (!library) throw new Error("NOT_FOUND: Library not found");
+        if (!library) throw new AppError('Library not found', 404, 'NOT_FOUND');
 
         const isAdmin = adminRole === 'admin' || adminRole === 'co-admin';
         const isLibraryOwner = adminRole === 'library_owner' && library.ownerId.toString() === adminId.toString();
 
-        if (!isAdmin && !isLibraryOwner) throw new Error("FORBIDDEN: Unauthorized");
+        if (!isAdmin && !isLibraryOwner) throw new AppError('Unauthorized', 403, 'FORBIDDEN');
 
         const subscription = await Subscription.findById(subscriptionId).session(session);
-        if (!subscription) throw new Error("NOT_FOUND: Subscription not found");
+        if (!subscription) throw new AppError('Subscription not found', 404, 'NOT_FOUND');
         if (subscription.libraryId.toString() !== libraryId.toString()) {
-            throw new Error("BAD_REQUEST: Subscription does not belong to this library");
+            throw new AppError('Subscription does not belong to this library', 400, 'BAD_REQUEST');
         }
 
         const userId = subscription.userId;
@@ -725,14 +649,7 @@ exports.deleteSubscription = async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         console.error("Delete Sub Error:", err);
-        const code = err.message.split(':')[0];
-        const msg = err.message.split(': ')[1] || "Failed";
-
-        if (code === "BAD_REQUEST") return res.status(400).json({ success: false, msg });
-        if (code === "NOT_FOUND") return res.status(404).json({ success: false, msg });
-        if (code === "FORBIDDEN") return res.status(403).json({ success: false, msg });
-
-        res.status(500).json({ success: false, msg: "Failed to cancel subscription" });
+        handleAppError(err, res, 'Failed to cancel subscription');
     } finally {
         session.endSession();
     }
@@ -879,7 +796,7 @@ exports.autoReleaseSeats = async (req, res) => {
 
 exports.getAttendanceHistory = async (req, res) => {
     try {
-        const userId = req.finduser._id;
+        const userId = req.user._id;
 
         // 1. Fetch total count of user's attendance records to detect missing migration
         const totalAttendanceCount = await Attendance.countDocuments({ userId });
@@ -934,30 +851,30 @@ exports.grantGracePeriod = async (req, res) => {
     try {
         const { libraryId, subscriptionId } = req.params;
         const { graceDays } = req.body;
-        const adminId = req.finduser._id;
-        const adminRole = req.finduser.role;
+        const adminId = req.user._id;
+        const adminRole = req.user.role;
 
         if (!graceDays || graceDays <= 0) {
-            throw new Error("BAD_REQUEST: Invalid grace days");
+            throw new AppError('Invalid grace days', 400, 'BAD_REQUEST');
         }
 
         const library = await Library.findById(libraryId).session(session);
-        if (!library) throw new Error("NOT_FOUND: Library not found");
+        if (!library) throw new AppError('Library not found', 404, 'NOT_FOUND');
 
         const isAdmin = adminRole === 'admin' || adminRole === 'co-admin';
         const isLibraryOwner = adminRole === 'library_owner' && library.ownerId.toString() === adminId.toString();
 
-        if (!isAdmin && !isLibraryOwner) throw new Error("FORBIDDEN: Unauthorized to grant grace period");
+        if (!isAdmin && !isLibraryOwner) throw new AppError('Unauthorized to grant grace period', 403, 'FORBIDDEN');
 
         const subscription = await Subscription.findById(subscriptionId).session(session);
-        if (!subscription) throw new Error("NOT_FOUND: Subscription not found");
+        if (!subscription) throw new AppError('Subscription not found', 404, 'NOT_FOUND');
 
         if (subscription.libraryId.toString() !== libraryId.toString()) {
-            throw new Error("BAD_REQUEST: Subscription does not belong to this library");
+            throw new AppError('Subscription does not belong to this library', 400, 'BAD_REQUEST');
         }
 
         if (subscription.expiryDate > new Date()) {
-            throw new Error("BAD_REQUEST: Cannot grant grace period to an active subscription");
+            throw new AppError('Cannot grant grace period to an active subscription', 400, 'BAD_REQUEST');
         }
 
         subscription.gracePeriodAllowed = true;
@@ -1001,14 +918,7 @@ exports.grantGracePeriod = async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         console.error("Grant Grace Period Error:", err);
-        const code = err.message.split(':')[0];
-        const msg = err.message.split(': ')[1] || "Failed";
-
-        if (code === "BAD_REQUEST") return res.status(400).json({ success: false, msg });
-        if (code === "NOT_FOUND") return res.status(404).json({ success: false, msg });
-        if (code === "FORBIDDEN") return res.status(403).json({ success: false, msg });
-
-        res.status(500).json({ success: false, msg: "Failed to grant grace period" });
+        handleAppError(err, res, 'Failed to grant grace period');
     } finally {
         session.endSession();
     }

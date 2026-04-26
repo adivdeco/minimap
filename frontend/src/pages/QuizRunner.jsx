@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Timer, ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft, Target, XCircle, MinusCircle, Eye, Trophy, BarChart3, Clock, ChevronDown, ChevronUp } from 'lucide-react';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 
 const QuizRunner = () => {
     const location = useLocation();
@@ -26,12 +26,11 @@ const QuizRunner = () => {
 
     const [questions, setQuestions] = useState([]);
     const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
-    const API_URL = import.meta.env.VITE_API_URL;
 
     useEffect(() => {
         const fetchQuestions = async () => {
             try {
-                const res = await axios.get(`${API_URL}/quizzes/${id}/questions`, { withCredentials: true });
+                const res = await axiosClient.get(`/quizzes/${id}/questions`);
                 setQuestions(res.data.questions || []);
             } catch (error) {
                 console.error("Failed to fetch questions", error);
@@ -45,7 +44,7 @@ const QuizRunner = () => {
         } else {
             setIsLoadingQuestions(false);
         }
-    }, [id, API_URL]);
+    }, [id]);
 
     // Phase 1: 3, 2, 1, GO
     useEffect(() => {
@@ -74,7 +73,7 @@ const QuizRunner = () => {
                             questionId: questions[parseInt(qIdx)]?._id,
                             selectedOptionIndex: optIdx
                         })).filter(r => r.questionId);
-                        axios.post(`${API_URL}/quiz-progress/${id}/submit`, { responses, timeTaken }, { withCredentials: true })
+                        axiosClient.post(`/quiz-progress/${id}/submit`, { responses, timeTaken })
                             .then(res => setResultData(res.data))
                             .catch(() => {})
                             .finally(() => setPhase('submitted'));
@@ -124,7 +123,7 @@ const QuizRunner = () => {
                 questionId: questions[parseInt(qIdx)]._id,
                 selectedOptionIndex: optIdx
             }));
-            const res = await axios.post(`${API_URL}/quiz-progress/${id}/submit`, { responses, timeTaken }, { withCredentials: true });
+            const res = await axiosClient.post(`/quiz-progress/${id}/submit`, { responses, timeTaken });
             setResultData(res.data);
         } catch (err) {
             console.error('Submit error:', err);

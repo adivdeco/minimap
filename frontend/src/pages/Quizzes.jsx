@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Search, Clock, Target, Atom, Beaker, Award, Code, Brain, Zap, Plus, Edit2, Trash2, X, AlertCircle, Database, Trophy, RotateCcw, Eye, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
@@ -75,7 +75,6 @@ const Quizzes = () => {
         themeColor: 'emerald'
     });
 
-    const API_URL = import.meta.env.VITE_API_URL;
 
     useEffect(() => {
         fetchQuizzes();
@@ -85,8 +84,8 @@ const Quizzes = () => {
         try {
             setLoading(true);
             const [quizRes, progressRes] = await Promise.all([
-                axios.get(`${API_URL}/quizzes`, { withCredentials: true }),
-                axios.get(`${API_URL}/quiz-progress/batch`, { withCredentials: true }).catch(() => ({ data: { progressMap: {} } }))
+                axiosClient.get('/quizzes'),
+                axiosClient.get('/quiz-progress/batch').catch(() => ({ data: { progressMap: {} } }))
             ]);
             setQuizzes(quizRes.data.quizzes || []);
             setProgressMap(progressRes.data.progressMap || {});
@@ -127,10 +126,10 @@ const Quizzes = () => {
         e.preventDefault();
         try {
             if (editMode) {
-                await axios.put(`${API_URL}/quizzes/${currentQuizId}`, formData, { withCredentials: true });
+                await axiosClient.put(`/quizzes/${currentQuizId}`, formData);
                 toast.success("Mock test updated successfully!");
             } else {
-                await axios.post(`${API_URL}/quizzes`, formData, { withCredentials: true });
+                await axiosClient.post('/quizzes', formData);
                 toast.success("Mock test created successfully!");
             }
             fetchQuizzes();
@@ -144,7 +143,7 @@ const Quizzes = () => {
     const handleDeleteQuiz = async (id) => {
         if (!confirm("Are you sure you want to delete this mock test?")) return;
         try {
-            await axios.delete(`${API_URL}/quizzes/${id}`, { withCredentials: true });
+            await axiosClient.delete(`/quizzes/${id}`);
             toast.success("Mock test deleted successfully.");
             fetchQuizzes();
         } catch (error) {
@@ -542,7 +541,7 @@ const Quizzes = () => {
                 )}
             </AnimatePresence>
 
-            <style jsx>{`
+            <style> {`
                 .hide-scrollbar::-webkit-scrollbar {
                     display: none;
                 }

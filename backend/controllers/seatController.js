@@ -9,8 +9,8 @@ const Attendance = require('../models/Attendance');
 const getLibrarySeats = async (req, res) => {
     try {
         const { libraryId } = req.params;
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
 
         // Allow anyone with a valid token to view seats (for booking/map)
         // Ensure library exists
@@ -36,8 +36,8 @@ const updateSeat = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, category, seatNumber } = req.body; // Allow updating status or category manually
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
 
         const seat = await Seat.findById(id);
         if (!seat) return res.status(404).json({ message: "Seat not found" });
@@ -144,8 +144,8 @@ const updateSeat = async (req, res) => {
 const updateSeatPositions = async (req, res) => {
     try {
         const { positions } = req.body; // Array of { id, x, y }
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
 
         if (!Array.isArray(positions) || positions.length === 0) {
             return res.status(400).json({ message: "No positions data provided" });
@@ -186,8 +186,8 @@ const reserveSeat = async (req, res) => {
     try {
         const { id } = req.params;
         const { userId, reservationType, startTime, endTime } = req.body;
-        const adminId = req.finduser._id;
-        const role = req.finduser.role;
+        const adminId = req.user._id;
+        const role = req.user.role;
 
         if (!userId || !reservationType) {
             return res.status(400).json({ message: "Missing required reservation fields" });
@@ -269,8 +269,8 @@ const reserveSeat = async (req, res) => {
 const cancelReservation = async (req, res) => {
     try {
         const { id } = req.params;
-        const adminId = req.finduser._id;
-        const role = req.finduser.role;
+        const adminId = req.user._id;
+        const role = req.user.role;
 
         const seat = await Seat.findById(id);
         if (!seat) return res.status(404).json({ message: "Seat not found" });

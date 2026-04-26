@@ -45,8 +45,8 @@ exports.getLibraryPlans = async (req, res) => {
 exports.createPlan = async (req, res) => {
     try {
         const { libraryId, name, price, durationInDays, hoursPerDay, trialDays, description, features, isPopular } = req.body;
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
 
         // Verify Ownership
         if (role !== 'admin' && role !== 'co-admin') {
@@ -87,8 +87,8 @@ exports.updatePlan = async (req, res) => {
     try {
         const { id } = req.params;
         const updateData = req.body;
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
 
         const plan = await Plan.findById(id);
         if (!plan) return res.status(404).json({ message: "Plan not found" });
@@ -120,8 +120,8 @@ exports.updatePlan = async (req, res) => {
 exports.deletePlan = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.finduser._id;
-        const role = req.finduser.role;
+        const userId = req.user._id;
+        const role = req.user.role;
 
         const plan = await Plan.findById(id);
         if (!plan) return res.status(404).json({ message: "Plan not found" });

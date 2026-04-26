@@ -51,7 +51,6 @@ const authMiddleware = async (req, res, next) => {
         }
 
         req.user = user;
-        req.finduser = user; // Backward compatibility for controllers
         next();
 
     } catch (err) {
