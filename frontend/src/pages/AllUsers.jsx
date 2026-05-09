@@ -299,6 +299,7 @@ function AllUsers() {
                                                             {user.role}
                                                         </span>
                                                         <span className="text-sm text-gray-500">{user.email}</span>
+                                                        <span className="text-sm text-gray-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'}</span>
                                                     </div>
                                                 </div>
                                             </div>
