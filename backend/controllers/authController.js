@@ -177,6 +177,13 @@ const loginUser = async (req, res) => {
             });
         }
 
+        if (user.isLocked) {
+            return res.status(403).json({
+                success: false,
+                error: "Your account has been suspended by system administrators. Please contact support."
+            });
+        }
+
         // Check verification status (skip for admins/pre-verified users if needed, 
         // but strictly enforcing it for security)
         // Feature implementation date approx: 2026-02-19T22:00:00.000Z

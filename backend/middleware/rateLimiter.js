@@ -1,9 +1,17 @@
 const rateLimit = require('express-rate-limit');
+const SystemConfig = require('../models/SystemConfig');
 
 // General API Rate Limiter
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 800, // Limit each IP to 100 requests per windowMs
+    max: async (req, res) => {
+        try {
+            const config = await SystemConfig.findOne({ key: 'apiRateLimitMax' });
+            return config ? Number(config.value) : 800;
+        } catch (err) {
+            return 800;
+        }
+    },
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     message: {

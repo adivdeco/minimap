@@ -65,9 +65,9 @@ const QuickActionsGrid = ({ isAdmin, userRole, setShowAttendance }) => {
                 {isAdmin && (
                     <ActionCard
                         icon={<Users size={24} className="text-yellow-600 dark:text-yellow-400" />}
-                        title="Manage Users"
-                        subtitle="Admin control panel"
-                        onClick={() => navigate('/users')}
+                        title="Admin Portal"
+                        subtitle="System & user controls"
+                        onClick={() => navigate('/admin')}
                     />
                 )}
 

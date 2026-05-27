@@ -116,7 +116,10 @@ const userSchema = new Schema({
     fcmToken: { type: String }, // Important for "Subscription Expiring" alerts
 
     // --- 7. Email Verification ---
-    emailVerified: { type: Boolean, default: false }
+    emailVerified: { type: Boolean, default: false },
+
+    // --- 8. Security Suspension ---
+    isLocked: { type: Boolean, default: false }
 
 }, { timestamps: true });
 

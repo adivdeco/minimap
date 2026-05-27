@@ -20,7 +20,10 @@ const questionRoutes = require('./routes/questionRoutes');
 const quizProgressRoutes = require('./routes/quizProgressRoutes');
 
 // Connect to database
-connectDB();
+connectDB().then(() => {
+    const seedSystemConfig = require('./utils/configSeeder');
+    seedSystemConfig();
+});
 
 // Initialize Cron Jobs
 initScheduler();
@@ -29,6 +32,9 @@ const app = express();
 app.set("trust proxy", 1);
 
 const { apiLimiter } = require('./middleware/rateLimiter');
+const apiTracker = require('./middleware/apiTracker');
+const adminRoutes = require('./routes/adminRoutes');
+const ipBlacklist = require('./middleware/ipBlacklist');
 
 
 // Middleware
@@ -66,7 +72,9 @@ app.get('/', (req, res) => {
     res.send('✅ JWT Server is running or server is live');
 });
 
-// Apply Rate Limiting
+// Apply API tracker first, then blacklist, then rate limiting, then routes
+app.use('/api', apiTracker);
+app.use('/api', ipBlacklist);
 app.use('/api', apiLimiter);
 
 // Routes
@@ -75,10 +83,11 @@ app.use('/api/library', libraryRoutes);
 app.use('/api/seats', seatRoutes);
 app.use('/api/entry', entryRoutes);
 app.use('/api/plans', planRoutes);
-app.use('/api/notices', noticeRoutes);
+    app.use('/api/notices', noticeRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api', questionRoutes);
 app.use('/api/quiz-progress', quizProgressRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

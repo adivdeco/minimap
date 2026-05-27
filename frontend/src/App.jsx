@@ -12,7 +12,7 @@ const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const Home = lazy(() => import('./pages/Home'));
 const AddLibrary = lazy(() => import('./pages/AddLibrary'));
-const AllUsers = lazy(() => import('./pages/AllUsers'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AllLibraries = lazy(() => import('./pages/AllLibraries'));
 const MyLibraries = lazy(() => import('./pages/MyLibraries'));
 const EditLibrary = lazy(() => import('./pages/EditLibrary'));
@@ -51,7 +51,7 @@ function App() {
                 <Route path="/my-libraries" element={<ProtectedRoute><MyLibraries /></ProtectedRoute>} />
                 <Route path="/edit-library/:id" element={<ProtectedRoute><EditLibrary /></ProtectedRoute>} />
                 <Route path="/library/:id/admin" element={<ProtectedRoute><LibraryAdminPanel /></ProtectedRoute>} />
-                <Route path="/users" element={<ProtectedRoute><AllUsers /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/library/:id/users" element={<ProtectedRoute><ManageUsers /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/quizzes" element={<ProtectedRoute><Quizzes /></ProtectedRoute>} />

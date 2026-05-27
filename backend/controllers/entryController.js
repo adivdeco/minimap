@@ -8,8 +8,17 @@ const authMiddleware = require('../middleware/authMiddleware');
 const mongoose = require('mongoose');
 const AppError = require('../utils/AppError');
 
-// --- CONFIGURATION ---
-const MAX_DAILY_CHECKINS = 3;
+const SystemConfig = require('../models/SystemConfig');
+
+// --- HELPER: Fetch Max Daily Checkins Config ---
+async function getMaxDailyCheckins() {
+    try {
+        const config = await SystemConfig.findOne({ key: 'maxDailyCheckins' });
+        return config ? Number(config.value) : 3;
+    } catch (err) {
+        return 3;
+    }
+}
 
 // --- HELPER: Get Today's Usage Stats (With Session) ---
 async function getDailyStats(userId, libraryId, session) {
@@ -173,10 +182,12 @@ async function assignSeat(library, userId, subscription, dailyStats, session, re
     const rMins = Math.floor(remainingMinutes % 60);
     const isReserved = !!reservedSeatDoc;
 
+    const maxDailyCheckins = await getMaxDailyCheckins();
+
     return {
         seat: seat.seatNumber,
-        checkinsRemaining: MAX_DAILY_CHECKINS - (dailyStats.sessionsCount + 1),
-        maxDailyCheckins: MAX_DAILY_CHECKINS,
+        checkinsRemaining: maxDailyCheckins - (dailyStats.sessionsCount + 1),
+        maxDailyCheckins: maxDailyCheckins,
         remainingTime: { hours: rHours, minutes: rMins },
         msg: isReserved
             ? `Checked In to your Reserved Seat: ${seat.seatNumber}`
@@ -205,8 +216,9 @@ exports.checkIn = async (req, res) => {
 
         // 3. Security Check: Daily Limits
         const dailyStats = await getDailyStats(userId, library._id, session);
-        if (dailyStats.sessionsCount >= MAX_DAILY_CHECKINS) {
-            throw new AppError(`Daily entry limit reached (${MAX_DAILY_CHECKINS} times/day).`, 403, 'LIMIT');
+        const maxDailyCheckins = await getMaxDailyCheckins();
+        if (dailyStats.sessionsCount >= maxDailyCheckins) {
+            throw new AppError(`Daily entry limit reached (${maxDailyCheckins} times/day).`, 403, 'LIMIT');
         }
 
         // 4. Check Subscription
@@ -458,11 +470,13 @@ exports.checkOut = async (req, res) => {
 
         await session.commitTransaction();
 
+        const maxDailyCheckins = await getMaxDailyCheckins();
+
         res.json({
             success: true,
             msg: `Checked out successfully. Session: ${durationMinutes} mins.`,
-            checkinsRemaining: MAX_DAILY_CHECKINS - dailyStats.sessionsCount,
-            maxDailyCheckins: MAX_DAILY_CHECKINS,
+            checkinsRemaining: maxDailyCheckins - dailyStats.sessionsCount,
+            maxDailyCheckins: maxDailyCheckins,
             remainingTime: {
                 hours: Math.floor(remainingMinutes / 60),
                 minutes: Math.floor(remainingMinutes % 60)

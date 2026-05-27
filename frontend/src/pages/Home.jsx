@@ -177,7 +177,7 @@ const Home = () => {
                         <div className="hidden md:flex items-center gap-2">
                             <NavLink onClick={() => navigate('/libraries')} icon={<Library size={16} />} text="Libraries" />
                             {hasSubscription && <NavLink onClick={() => setShowAttendance(true)} icon={<CalendarDays size={16} />} text="History" />}
-                            {isAdmin && <NavLink onClick={() => navigate('/users')} icon={<Users size={16} />} text="Users" />}
+                            {isAdmin && <NavLink onClick={() => navigate('/admin')} icon={<Users size={16} />} text="Admin" />}
 
                             {/* Theme Toggle */}
                             <button

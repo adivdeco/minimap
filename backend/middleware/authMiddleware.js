@@ -50,6 +50,10 @@ const authMiddleware = async (req, res, next) => {
             userCache.set(cacheKey, user);
         }
 
+        if (user.isLocked) {
+            return res.status(403).json({ message: "Your account has been suspended by system administrators." });
+        }
+
         req.user = user;
         next();
 
