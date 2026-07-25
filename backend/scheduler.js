@@ -5,7 +5,7 @@ const initScheduler = () => {
     console.log("Initializing Scheduler...");
 
     // Run every 10 minutes
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/10 * * * *', async () => {
         console.log(`[${new Date().toISOString()}] Running Auto-Release Seats Job...`);
         try {
             const result = await releaseExpiredSeats();

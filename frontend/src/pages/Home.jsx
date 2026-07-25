@@ -151,7 +151,7 @@ const Home = () => {
             {/* Ambient Background Glows */}
             <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-200/40 dark:bg-purple-900/20 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-200/40 dark:bg-indigo-900/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-orange-200/40 dark:bg-orange-900/20 rounded-full blur-[120px]" />
             </div>
 
             {/* Navigation */}
@@ -378,6 +378,13 @@ const Home = () => {
                         setShowAttendance={setShowAttendance}
                     />
                 </motion.div>
+
+                <div className="mt-45 mb-[-50px]">
+                    <h1 className="text-gray-600 dark:text-gray-400 text-5xl justify-center font-bold flex gap-2 font-serif">
+                        <p className='opacity-30'>Build with</p> <p className='opacity-75'>❤️</p>
+                    </h1>
+                </div>
+
             </main>
 
             {/* Scanner Modal */}
