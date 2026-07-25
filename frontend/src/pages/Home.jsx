@@ -11,7 +11,7 @@ import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import { useQuery } from '@tanstack/react-query';
 import {
-    Library, CalendarDays, Sun, Moon, X, ChevronRight, Users, Bell
+    Library, CalendarDays, Sun, Moon, X, ChevronRight, Users, Bell, Heart, Sparkles, Code2
 } from 'lucide-react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import ActiveSessionCard from '../components/dashboard/ActiveSessionCard';
@@ -379,11 +379,53 @@ const Home = () => {
                     />
                 </motion.div>
 
-                <div className="mt-45 mb-[-50px]">
-                    <h1 className="text-gray-600 dark:text-gray-400 text-5xl justify-center font-bold flex gap-2 font-serif">
-                        <p className='opacity-30'>Build with</p> <p className='opacity-75'>❤️</p>
-                    </h1>
-                </div>
+                {/* Footer Art & Branding */}
+                <footer className="relative mt-24 pt-12 pb-16 overflow-hidden">
+
+                    {/* Decorative Top Line with Center Badge */}
+                    <div className="relative flex items-center justify-center mb-8">
+                        <div className="h-[1px] w-full max-w-xs bg-gradient-to-r from-transparent via-gray-300 dark:via-white/20 to-transparent" />
+                        <div className="px-4 text-xs tracking-widest uppercase font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-100/60 dark:bg-white/5 backdrop-blur-md border border-gray-200/60 dark:border-white/10 rounded-full py-1 shadow-sm">
+                            <Sparkles size={12} className="text-amber-400 animate-pulse" />
+                            <span>StudySpace</span>
+                            <Sparkles size={12} className="text-amber-400 animate-pulse" />
+                        </div>
+                        <div className="h-[1px] w-full max-w-xs bg-gradient-to-r from-transparent via-gray-300 dark:via-white/20 to-transparent" />
+                    </div>
+
+                    <div className="relative flex flex-col items-center justify-center text-center gap-3">
+                        <motion.h1 
+                            initial={{ opacity: 0, y: 10 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight flex items-center justify-center gap-3 font-sans select-none"
+                        >
+                            <span className="bg-gradient-to-r from-gray-700 via-gray-900 to-gray-600 dark:from-gray-300 dark:via-white dark:to-gray-400 bg-clip-text text-transparent opacity-60">
+                                Built with
+                            </span>
+                            <motion.span 
+                                animate={{ scale: [1, 1.25, 1, 1.2, 1] }}
+                                transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+                                className="inline-flex items-center justify-center relative cursor-pointer"
+                            >
+                                <Heart size={40} className=" opacity-75 text-red-500 fill-red-500 drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]" />
+                            </motion.span>
+                        </motion.h1>
+
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium tracking-wide">
+                            Empowering modern libraries & spaces with effortless management
+                        </p>
+
+                        {/* Subtle Copyright / Version detail */}
+                        <div className="mt-4 flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+                            <span>© {new Date().getFullYear()} StudySpace</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                                <Code2 size={12} className="text-purple-400" /> Precision • Passion • Performance
+                            </span>
+                        </div>
+                    </div>
+                </footer>
 
             </main>
 
