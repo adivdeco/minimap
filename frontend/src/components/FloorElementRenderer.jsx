@@ -92,17 +92,20 @@ const ELEMENT_CONFIG = {
  * @param {boolean} isEditMode - Whether to show delete button and edit affordances
  * @param {function} onDelete - Callback when delete button is clicked
  */
-const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
+const FloorElementRenderer = ({ element, isEditMode = false, isSelected = false }) => {
     const config = ELEMENT_CONFIG[element.type];
     if (!config) return null;
 
     const Icon = config.icon;
+    const selectedClasses = isSelected
+        ? 'ring-2 ring-indigo-600 ring-offset-2 ring-offset-white shadow-lg'
+        : '';
 
     // === WALL rendering ===
     if (element.type === 'wall') {
         return (
             <div
-                className={`absolute ${config.color} rounded-sm shadow-sm group/el z-[5]`}
+                className={`absolute ${config.color} rounded-sm shadow-sm z-[5] ${selectedClasses} transition-all`}
                 style={{
                     left: element.x,
                     top: element.y,
@@ -123,13 +126,8 @@ const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
                         {element.label}
                     </span>
                 )}
-                {isEditMode && onDelete && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(element._id); }}
-                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-50"
-                    >
-                        ×
-                    </button>
+                {isSelected && (
+                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border border-white" />
                 )}
             </div>
         );
@@ -139,7 +137,7 @@ const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
     if (element.type === 'window') {
         return (
             <div
-                className={`absolute ${config.color} group/el z-[5]`}
+                className={`absolute ${config.color} z-[5] ${selectedClasses} transition-all`}
                 style={{
                     left: element.x,
                     top: element.y,
@@ -159,13 +157,8 @@ const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
                         {element.label}
                     </span>
                 )}
-                {isEditMode && onDelete && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(element._id); }}
-                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-50"
-                    >
-                        ×
-                    </button>
+                {isSelected && (
+                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border border-white" />
                 )}
             </div>
         );
@@ -175,7 +168,7 @@ const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
     if (element.type === 'label') {
         return (
             <div
-                className={`absolute group/el z-[5] flex items-center justify-center`}
+                className={`absolute z-[5] flex items-center justify-center ${selectedClasses} rounded px-1 transition-all`}
                 style={{
                     left: element.x,
                     top: element.y,
@@ -186,13 +179,8 @@ const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
                 <span className={`text-xs font-bold ${config.textColor} whitespace-nowrap uppercase tracking-widest opacity-70`}>
                     {element.label || 'Label'}
                 </span>
-                {isEditMode && onDelete && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(element._id); }}
-                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-50"
-                    >
-                        ×
-                    </button>
+                {isSelected && (
+                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border border-white" />
                 )}
             </div>
         );
@@ -201,7 +189,7 @@ const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
     // === ICON-BASED elements (entrance, exit, bathroom, water-cooler, reception) ===
     return (
         <div
-            className={`absolute ${config.color} border-2 ${config.borderColor} rounded-xl shadow-sm flex flex-col items-center justify-center group/el z-[5] transition-colors`}
+            className={`absolute ${config.color} border-2 ${config.borderColor} rounded-xl shadow-sm flex flex-col items-center justify-center z-[5] ${selectedClasses} transition-all`}
             style={{
                 left: element.x,
                 top: element.y,
@@ -227,13 +215,8 @@ const FloorElementRenderer = ({ element, isEditMode = false, onDelete }) => {
                 </div>
             )}
 
-            {isEditMode && onDelete && (
-                <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(element._id); }}
-                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center opacity-0 group-hover/el:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-50"
-                >
-                    ×
-                </button>
+            {isSelected && (
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border border-white" />
             )}
         </div>
     );
