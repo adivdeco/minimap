@@ -347,7 +347,7 @@ const Home = () => {
                                         </div>
                                     ) : (
                                         <div className="bg-gray-100 dark:bg-[#1a1a20] rounded-[20px] overflow-hidden">
-                                            <UserSeatMap seats={seats} activeSeatId={activeSeat?.seatId} />
+                                            <UserSeatMap seats={seats} activeSeatId={activeSeat?.seatId} libraryId={libraryId} />
                                         </div>
                                     )}
                                 </div>

@@ -18,6 +18,7 @@ const noticeRoutes = require('./routes/noticeRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const questionRoutes = require('./routes/questionRoutes');
 const quizProgressRoutes = require('./routes/quizProgressRoutes');
+const floorElementRoutes = require('./routes/floorElementRoutes');
 
 // Connect to database
 connectDB().then(() => {
@@ -88,6 +89,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api', questionRoutes);
 app.use('/api/quiz-progress', quizProgressRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/floor-elements', floorElementRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

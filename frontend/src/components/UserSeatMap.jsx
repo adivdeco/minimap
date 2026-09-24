@@ -4,8 +4,10 @@ import {
     Armchair, ZoomIn, ZoomOut, User, Move,
     RotateCcw, MapPin, Info
 } from 'lucide-react';
+import { getFloorElements } from '../api/floorElement';
+import FloorElementRenderer from './FloorElementRenderer';
 
-const UserSeatMap = ({ seats, activeSeatId }) => {
+const UserSeatMap = ({ seats, activeSeatId, libraryId }) => {
     const { theme } = useTheme();
     // --- Viewport State ---
     const [scale, setScale] = useState(1);
@@ -13,6 +15,9 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const containerRef = useRef(null);
+
+    // Floor Elements
+    const [floorElements, setFloorElements] = useState([]);
 
     // Calculate canvas boundaries based on seats
     const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
@@ -26,6 +31,21 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
             height: Math.max(800, maxY + 300)
         });
     }, [seats]);
+
+    // Fetch floor elements for the library
+    useEffect(() => {
+        if (!libraryId) return;
+        const fetchElements = async () => {
+            try {
+                const data = await getFloorElements(libraryId);
+                setFloorElements(data);
+            } catch (err) {
+                // Floor elements are supplementary, silently fail
+                console.error('Failed to load floor elements:', err);
+            }
+        };
+        fetchElements();
+    }, [libraryId]);
 
     // --- Pan & Zoom Handlers ---
     const handleMouseDown = (e) => {
@@ -141,7 +161,7 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
             <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 bg-white dark:bg-[#0F0F12] p-4 rounded-2xl border border-gray-200 dark:border-white/10 shadow-xl transition-colors">
 
                 {/* Legend */}
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
                         <span className="relative flex h-3 w-3">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
@@ -153,14 +173,28 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                         <div className="w-3 h-3 rounded bg-gray-200 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Taken</span>
                     </div>
-                    {/* <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                        <div className="w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700"></div>
-                        <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Reserved</span>
-                    </div> */}
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Empty</span>
                     </div>
+
+                    {/* Floor Element Legend */}
+                    {floorElements.length > 0 && (
+                        <>
+                            <div className="w-px h-4 bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block" />
+                            {[
+                                { color: 'bg-slate-600', label: 'Wall' },
+                                { color: 'bg-emerald-400', label: 'Door' },
+                                { color: 'bg-sky-400', label: 'WC' },
+                                { color: 'bg-cyan-400', label: 'Water' },
+                            ].map(item => (
+                                <div key={item.label} className="flex items-center gap-1.5">
+                                    <div className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
+                                    <span className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">{item.label}</span>
+                                </div>
+                            ))}
+                        </>
+                    )}
                 </div>
 
                 {/* Toolbar */}
@@ -216,6 +250,16 @@ const UserSeatMap = ({ seats, activeSeatId }) => {
                         height: canvasSize.height,
                     }}
                 >
+                    {/* --- FLOOR ELEMENTS (rendered first, below seats) --- */}
+                    {floorElements.map((element) => (
+                        <FloorElementRenderer
+                            key={element._id}
+                            element={element}
+                            isEditMode={false}
+                        />
+                    ))}
+
+                    {/* --- SEATS --- */}
                     {seats.map((seat) => {
                         const isMySeat = activeSeatId && seat._id.toString() === activeSeatId.toString();
 
