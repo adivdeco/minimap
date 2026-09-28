@@ -126,7 +126,7 @@ const LibraryDetails = () => {
                         <div>
                             <div className="flex items-center gap-3 mb-3">
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${library.isActive ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
-                                    {library.isActive ? 'Open Now' : 'Closed'}
+                                    {library.isActive ? 'Open Now' : 'Offline / Closed'}
                                 </span>
                                 <span className="flex items-center gap-1 text-yellow-400 bg-black/40 backdrop-blur-md px-2 py-1 rounded-lg border border-yellow-400/20">
                                     <Star size={14} fill="currentColor" />
@@ -139,10 +139,14 @@ const LibraryDetails = () => {
                         </div>
                         <div className="flex items-center gap-4 hidden md:flex">
                             <button
-                                className="px-8 py-3 bg-white text-gray-900 rounded-xl font-bold hover:bg-gray-100 transition-colors shadow-lg shadow-white/10 text-lg"
-                                onClick={() => setShowScanner(true)}
+                                disabled={!library.isActive}
+                                className={`px-8 py-3 rounded-xl font-bold transition-all shadow-lg text-lg ${library.isActive
+                                    ? 'bg-white text-gray-900 hover:bg-gray-100 shadow-white/10'
+                                    : 'bg-gray-600/50 text-gray-400 cursor-not-allowed border border-white/10'
+                                    }`}
+                                onClick={() => library.isActive && setShowScanner(true)}
                             >
-                                Book a Seat
+                                {library.isActive ? 'Book a Seat' : 'Library Offline'}
                             </button>
                         </div>
                     </div>
@@ -151,6 +155,15 @@ const LibraryDetails = () => {
 
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-28 md:pb-12 relative z-10">
+                {!library.isActive && (
+                    <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
+                        <div>
+                            <h4 className="font-bold text-sm">Library is Currently Offline</h4>
+                            <p className="text-xs text-red-500/80 mt-0.5">This library has been set offline by administration. QR check-ins and new seat bookings are temporarily disabled.</p>
+                        </div>
+                    </div>
+                )}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                     {/* Left Column - Details */}
@@ -409,11 +422,15 @@ const LibraryDetails = () => {
             {/* Sticky Mobile Bottom Booking Bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 pb-6 bg-white/85 dark:bg-[#050505]/95 backdrop-blur-xl border-t border-gray-200 dark:border-white/10 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.3)] z-40">
                 <button
-                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-[0_8px_20px_-8px_rgba(147,51,234,0.5)] active:scale-95 transition-all flex items-center justify-center gap-2"
-                    onClick={() => setShowScanner(true)}
+                    disabled={!library.isActive}
+                    className={`w-full py-4 text-white rounded-2xl font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${library.isActive
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-[0_8px_20px_-8px_rgba(147,51,234,0.5)]'
+                        : 'bg-gray-600/60 cursor-not-allowed opacity-75'
+                        }`}
+                    onClick={() => library.isActive && setShowScanner(true)}
                 >
                     <Zap size={20} className="fill-current" />
-                    Book a Seat Now
+                    {library.isActive ? 'Book a Seat Now' : 'Library Offline'}
                 </button>
             </div>
 

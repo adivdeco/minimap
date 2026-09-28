@@ -210,6 +210,11 @@ exports.checkIn = async (req, res) => {
         const library = await Library.findOne({ 'accessConfig.qrCodeData': qrCodeString }).session(session);
         if (!library) throw new AppError('Invalid QR Code', 404, 'NOT_FOUND');
 
+        // Check if library is active/online
+        if (!library.isActive) {
+            throw new AppError('Library is currently offline. Entry is disabled.', 403, 'LIBRARY_OFFLINE');
+        }
+
         // 2. Prevent Double Entry
         const existingSeat = await Seat.findOne({ currentOccupant: userId }).session(session);
         if (existingSeat) throw new AppError(`You are already seated at ${existingSeat.seatNumber}.`, 400, 'BAD_REQUEST');
@@ -352,6 +357,10 @@ exports.activateTrial = async (req, res) => {
 
         const library = await Library.findById(libraryId).session(session);
         if (!library) throw new AppError('Library not found', 404, 'NOT_FOUND');
+
+        if (!library.isActive) {
+            throw new AppError('Library is currently offline. Trial activation is unavailable.', 403, 'LIBRARY_OFFLINE');
+        }
 
         const plan = await resolvePlan(planId, library);
         if (!plan || !plan.trialDays || plan.trialDays <= 0) throw new AppError('Invalid Trial Plan', 400, 'BAD_REQUEST');

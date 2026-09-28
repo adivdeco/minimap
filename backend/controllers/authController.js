@@ -157,7 +157,7 @@ const loginUser = async (req, res) => {
         const user = await User.findOne({ email }).select('+password')
             .populate({
                 path: 'studentDetails.currentSubscription.libraryId',
-                select: 'libraryName location'
+                select: 'libraryName location isActive'
             })
             .populate({
                 path: 'studentDetails.currentSubscription.subscriptionId',
@@ -385,7 +385,7 @@ const checkSession = async (req, res) => {
             .select('-password')
             .populate({
                 path: 'studentDetails.currentSubscription.libraryId',
-                select: 'libraryName location'
+                select: 'libraryName location isActive'
             })
             .populate({
                 path: 'studentDetails.currentSubscription.subscriptionId',

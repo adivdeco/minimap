@@ -56,7 +56,13 @@ const AllLibraries = () => {
         }
     };
 
-    const handleToggleStatus = async (libId) => {
+    const handleToggleStatus = async (libId, currentStatus, libName) => {
+        const actionPrompt = currentStatus
+            ? `Are you sure you want to take "${libName}" OFFLINE? Its QR code check-in and reservations will be immediately disabled.`
+            : `Are you sure you want to bring "${libName}" back ONLINE?`;
+
+        if (!window.confirm(actionPrompt)) return;
+
         try {
             const response = await toggleLibraryStatus(libId);
             setLibraries(libraries.map(l =>
@@ -226,7 +232,7 @@ const AllLibraries = () => {
                                     {/* Status Badge */}
                                     <div className="absolute top-4 right-4 backdrop-blur-md bg-black/30 border border-white/10 px-3 py-1 rounded-full text-xs font-semibold text-white flex items-center gap-2 z-10">
                                         <span className={`w-2 h-2 rounded-full ${lib.isActive ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-red-400'}`}></span>
-                                        {lib.isActive ? 'Active' : 'Inactive'}
+                                        {lib.isActive ? 'Online' : 'Offline'}
                                     </div>
 
                                     {/* Overlay Gradient */}
@@ -292,9 +298,9 @@ const AllLibraries = () => {
                                                     <Edit size={16} />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleToggleStatus(lib._id)}
+                                                    onClick={() => handleToggleStatus(lib._id, lib.isActive, lib.libraryName)}
                                                     className={`p-2.5 rounded-xl hover:bg-opacity-20 transition-colors ${lib.isActive ? 'bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500' : 'bg-green-500/10 text-green-600 hover:bg-green-500'}`}
-                                                    title={lib.isActive ? "Deactivate" : "Activate"}
+                                                    title={lib.isActive ? "Take Offline (Disable Check-in & Bookings)" : "Bring Online (Activate)"}
                                                 >
                                                     <Power size={16} />
                                                 </button>

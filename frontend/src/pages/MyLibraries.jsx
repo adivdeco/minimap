@@ -13,6 +13,7 @@ import {
 const MyLibraries = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [libraries, setLibraries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -250,24 +251,33 @@ const MyLibraries = () => {
                                         </button>
                                     
 
-                                        <div className="grid grid-cols-2 gap-3">
+                                        {!lib.isActive && (
+                                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+                                                <Power size={14} className="shrink-0" />
+                                                <span>Library is <strong>OFFLINE</strong>. Deactivated by administrator. QR check-ins and bookings are disabled.</span>
+                                            </div>
+                                        )}
+
+                                        <div className={isAdmin ? "grid grid-cols-2 gap-3" : "flex flex-col gap-2"}>
                                             <button
                                                 onClick={() => navigate(`/edit-library/${lib._id}`)}
-                                                className="py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2 text-sm"
+                                                className="w-full py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2 text-sm"
                                             >
                                                 <Edit size={16} /> Edit Details
                                             </button>
 
-                                            <button
-                                                onClick={() => handleToggleStatus(lib._id)}
-                                                className={`py-2.5 border font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm ${lib.isActive
-                                                    ? 'border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
-                                                    : 'border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10'
-                                                    }`}
-                                            >
-                                                <Power size={16} />
-                                                {lib.isActive ? 'Go Offline' : 'Go Online'}
-                                            </button>
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={() => handleToggleStatus(lib._id)}
+                                                    className={`py-2.5 border font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm ${lib.isActive
+                                                        ? 'border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
+                                                        : 'border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10'
+                                                        }`}
+                                                >
+                                                    <Power size={16} />
+                                                    {lib.isActive ? 'Go Offline' : 'Go Online'}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

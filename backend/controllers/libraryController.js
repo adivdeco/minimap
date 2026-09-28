@@ -509,11 +509,10 @@ const toggleLibraryStatus = async (req, res) => {
             return res.status(404).json({ message: "Library not found" });
         }
 
-        // Check permissions
-        const isOwner = library.ownerId.toString() === userId.toString();
-        if (role !== 'admin' && role !== 'co-admin' && !isOwner) {
+        // Check permissions: ONLY Super Admin can take a library offline/online
+        if (role !== 'admin') {
             return res.status(403).json({
-                message: "Forbidden: You do not have access to modify this library"
+                message: "Forbidden: Only Admin has permission to take libraries offline or activate them."
             });
         }
 
@@ -521,7 +520,7 @@ const toggleLibraryStatus = async (req, res) => {
         await library.save();
 
         res.status(200).json({
-            message: `Library ${library.isActive ? 'activated' : 'deactivated'} successfully`,
+            message: `Library ${library.isActive ? 'activated (Online)' : 'deactivated (Offline)'} successfully`,
             isActive: library.isActive
         });
 

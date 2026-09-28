@@ -301,6 +301,19 @@ const Home = () => {
                     {/* Header */}
                     <DashboardHeader user={user} />
 
+                    {/* Offline Library Alert */}
+                    {subscription?.libraryId && subscription?.libraryId?.isActive === false && (
+                        <motion.div variants={itemVariants} className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center gap-3">
+                            <span className="w-3 h-3 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                            <div className="flex-1">
+                                <h4 className="font-bold text-sm">Your Library is Currently Offline</h4>
+                                <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">
+                                    {libraryName || 'This library'} is currently deactivated by administration. QR check-in and new bookings are disabled until it is back online.
+                                </p>
+                            </div>
+                        </motion.div>
+                    )}
+
                     {/* --- MASTER DASHBOARD GRID --- */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
 
@@ -347,7 +360,12 @@ const Home = () => {
                                         </div>
                                     ) : (
                                         <div className="bg-gray-100 dark:bg-[#1a1a20] rounded-[20px] overflow-hidden">
-                                            <UserSeatMap seats={seats} activeSeatId={activeSeat?.seatId} libraryId={libraryId} />
+                                            <UserSeatMap
+                                                seats={seats}
+                                                activeSeatId={activeSeat?.seatId}
+                                                libraryId={libraryId}
+                                                isOffline={subscription?.libraryId?.isActive === false}
+                                            />
                                         </div>
                                     )}
                                 </div>

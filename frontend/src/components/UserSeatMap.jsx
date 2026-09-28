@@ -7,7 +7,7 @@ import {
 import { getFloorElements } from '../api/floorElement';
 import FloorElementRenderer from './FloorElementRenderer';
 
-const UserSeatMap = ({ seats, activeSeatId, libraryId }) => {
+const UserSeatMap = ({ seats, activeSeatId, libraryId, isOffline = false }) => {
     const { theme } = useTheme();
     // --- Viewport State ---
     const [scale, setScale] = useState(1);
@@ -177,6 +177,13 @@ const UserSeatMap = ({ seats, activeSeatId, libraryId }) => {
                         <div className="w-3 h-3 rounded bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600"></div>
                         <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">Empty</span>
                     </div>
+
+                    {isOffline && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                            Library Offline
+                        </div>
+                    )}
 
                     {/* Floor Element Legend */}
                     {floorElements.length > 0 && (

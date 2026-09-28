@@ -196,10 +196,15 @@ const reserveSeat = async (req, res) => {
         const seat = await Seat.findById(id);
         if (!seat) return res.status(404).json({ message: "Seat not found" });
 
+        const library = await Library.findById(seat.libraryId);
+        if (!library) return res.status(404).json({ message: "Library not found" });
+        if (!library.isActive) {
+            return res.status(400).json({ message: "Cannot reserve seats while the library is offline." });
+        }
+
         // Permission check
         if (role !== 'admin' && role !== 'co-admin') {
-            const library = await Library.findById(seat.libraryId);
-            if (!library || (role === 'library_owner' && library.ownerId.toString() !== adminId.toString())) {
+            if (role === 'library_owner' && library.ownerId.toString() !== adminId.toString()) {
                 return res.status(403).json({ message: "Access denied" });
             }
         }
