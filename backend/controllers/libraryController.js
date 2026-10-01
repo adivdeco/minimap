@@ -901,6 +901,28 @@ const getLibraryUsers = async (req, res) => {
             attendanceMap.set(record._id.toString(), record);
         });
 
+        // Get today's attendance records to determine real-time presence
+        const startOfToday = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+
+        const todayRecords = await Attendance.find({
+            libraryId: library._id,
+            userId: { $in: userIds },
+            date: { $gte: startOfToday, $lt: endOfToday }
+        });
+
+        const todayAttendanceMap = new Map();
+        todayRecords.forEach(record => {
+            const hasOngoing = record.sessions && record.sessions.some(s => !s.checkOutTime);
+            todayAttendanceMap.set(record.userId.toString(), {
+                attendedToday: (record.sessionCount > 0 || (record.sessions && record.sessions.length > 0)),
+                isCurrentlyInside: hasOngoing,
+                totalMinutesToday: record.totalDurationToday || 0,
+                sessionCountToday: record.sessionCount || 0
+            });
+        });
+
         // Prepare detailed user data
         // Only process subs that match the search (if any)
         const relevantSubs = validSubscriptions.filter(sub =>
@@ -941,6 +963,10 @@ const getLibraryUsers = async (req, res) => {
                     totalMinutes: 0
                 };
 
+                const todayInfo = todayAttendanceMap.get(userIdStr);
+                const isPresent = todayInfo ? (todayInfo.isCurrentlyInside || todayInfo.attendedToday) : false;
+                const hasEverVisited = !!(attendance.lastVisit || (attendance.totalSessions && attendance.totalSessions > 0));
+
                 const planDetails = library.plans.find(p => p._id.toString() === sub.planId.toString());
 
                 userMap.set(userIdStr, {
@@ -967,7 +993,10 @@ const getLibraryUsers = async (req, res) => {
                         totalMinutesUsed: attendance.totalMinutes || 0,
                         totalHoursUsed: Math.round((attendance.totalMinutes || 0) / 60 * 100) / 100,
                         firstVisit: attendance.firstVisit || null,
-                        lastVisit: attendance.lastVisit || null
+                        lastVisit: attendance.lastVisit || null,
+                        isPresentToday: isPresent,
+                        isCurrentlyInside: todayInfo ? todayInfo.isCurrentlyInside : false,
+                        presenceStatus: isPresent ? 'Present' : (hasEverVisited ? 'Absent' : 'No recent activity')
                     },
                     joinedAt: sub.userId.createdAt
                 });
@@ -1110,7 +1139,21 @@ const getUserAnalytics = async (req, res) => {
             .slice(0, 10);
 
         // Plan details
-        const planDetails = library.plans.find(p => p._id.toString() === currentSubscription.planId.toString());
+        const planDetails = library.plans?.find(p => p._id.toString() === currentSubscription.planId?.toString());
+
+        // Determine today's presence for this user
+        const startOfToday = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+
+        const todayRecord = attendanceRecords.find(r => {
+            const rd = new Date(r.date);
+            return rd >= startOfToday && rd < endOfToday;
+        });
+
+        const isPresentToday = todayRecord ? (todayRecord.sessionCount > 0 || (todayRecord.sessions && todayRecord.sessions.length > 0)) : false;
+        const isCurrentlyInside = todayRecord ? (todayRecord.sessions && todayRecord.sessions.some(s => !s.checkOutTime)) : false;
+        const presenceStatus = isPresentToday ? 'Present' : (attendanceRecords.length > 0 ? 'Absent' : 'No recent activity');
 
         // Format subscription history
         const subscriptionHistory = subscriptions.map(sub => {
@@ -1122,7 +1165,11 @@ const getUserAnalytics = async (req, res) => {
                 startDate: sub.startDate,
                 expiryDate: sub.expiryDate,
                 status: sub.status,
-                pricePaid: sub.pricePaid
+                pricePaid: sub.pricePaid,
+                gracePeriodAllowed: sub.gracePeriodAllowed,
+                graceDaysAllowed: sub.graceDaysAllowed,
+                graceDaysUsed: sub.graceDaysUsed,
+                graceStartDate: sub.graceStartDate
             };
         });
 
@@ -1143,6 +1190,10 @@ const getUserAnalytics = async (req, res) => {
                 expiryDate: currentSubscription.expiryDate,
                 status: currentSubscription.status,
                 pricePaid: currentSubscription.pricePaid,
+                gracePeriodAllowed: currentSubscription.gracePeriodAllowed,
+                graceDaysAllowed: currentSubscription.graceDaysAllowed,
+                graceDaysUsed: currentSubscription.graceDaysUsed,
+                graceStartDate: currentSubscription.graceStartDate,
                 daysRemaining: currentSubscription.status === 'active'
                     ? Math.ceil((new Date(currentSubscription.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
                     : 0
@@ -1161,7 +1212,15 @@ const getUserAnalytics = async (req, res) => {
                 averageSessionDuration: avgSessionDuration,
                 totalVisitDays: attendanceRecords.length,
                 firstVisit: attendanceRecords.length > 0 ? attendanceRecords[attendanceRecords.length - 1].date : null,
-                lastVisit: attendanceRecords.length > 0 ? attendanceRecords[0].date : null
+                lastVisit: attendanceRecords.length > 0 ? attendanceRecords[0].date : null,
+                isPresentToday,
+                isCurrentlyInside,
+                presenceStatus
+            },
+            presence: {
+                isPresentToday,
+                isCurrentlyInside,
+                presenceStatus
             },
             recentSessions: latestSessions,
             allAttendance: attendanceRecords.map(record => ({
