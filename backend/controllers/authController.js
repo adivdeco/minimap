@@ -525,6 +525,75 @@ const updateUser = async (req, res) => {
     }
 };
 
+// @desc    Admin / Library Owner Add Student or User directly
+// @route   POST /api/auth/users
+const createUser = async (req, res) => {
+    try {
+        const callerRole = req.user.role;
+
+        // Permissions check: admin, co-admin, or library_owner
+        if (callerRole !== 'admin' && callerRole !== 'co-admin' && callerRole !== 'library_owner') {
+            return res.status(403).json({
+                message: "Forbidden: You do not have permission to create users"
+            });
+        }
+
+        const { name, email, password, phone, role } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: "Name, email, and password are required" });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ message: "Password must be at least 6 characters" });
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+        const existingUser = await User.findOne({ email: normalizedEmail });
+        if (existingUser) {
+            return res.status(400).json({ message: "A user with this email already exists" });
+        }
+
+        // Role assignment:
+        // Only super admin can assign admin/library_owner roles; library owners create 'User' (students)
+        let assignedRole = 'User';
+        if (callerRole === 'admin' && role) {
+            assignedRole = role;
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newUser = await User.create({
+            name: name.trim(),
+            email: normalizedEmail,
+            phone: phone ? phone.trim() : undefined,
+            password: hashedPassword,
+            role: assignedRole,
+            loginProvider: 'local',
+            emailVerified: true,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name.trim())}`
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "Student / User created successfully",
+            user: {
+                _id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                phone: newUser.phone,
+                role: newUser.role,
+                avatar: newUser.avatar,
+                createdAt: newUser.createdAt
+            }
+        });
+
+    } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).json({ message: error.message || 'Internal server error' });
+    }
+};
+
 // @desc    Delete user (Admin/Co-Admin only)
 // @route   DELETE /api/auth/users/:id
 const deleteUser = async (req, res) => {
@@ -650,6 +719,7 @@ module.exports = {
     logoutUser,
     checkSession,
     allUsers,
+    createUser,
     updateUser,
     deleteUser,
     updateProfile,

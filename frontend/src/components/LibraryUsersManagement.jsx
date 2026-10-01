@@ -21,6 +21,7 @@ import {
   getEngagementLevel,
   generateUserInsights
 } from '../api/libraryOwnerAnalytics';
+import { createUser } from '../api/users';
 import { jsPDF } from 'jspdf'; // Ensure jsPDF is imported for the utility
 
 // Inject jsPDF into window if your utility expects it there
@@ -50,6 +51,35 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
+
+  // Direct Student Creation State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStudent, setNewStudent] = useState({ name: '', email: '', password: '', phone: '' });
+  const [addingStudent, setAddingStudent] = useState(false);
+
+  const handleCreateStudent = async (e) => {
+    e.preventDefault();
+    if (!newStudent.name || !newStudent.email || !newStudent.password) {
+      toast.error("Name, email and password are required");
+      return;
+    }
+    if (newStudent.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setAddingStudent(true);
+    try {
+      const res = await createUser({ ...newStudent, role: 'User' });
+      toast.success(res.message || "Student created successfully!");
+      setShowAddModal(false);
+      setNewStudent({ name: '', email: '', password: '', phone: '' });
+      fetchLibraryUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to create student");
+    } finally {
+      setAddingStudent(false);
+    }
+  };
 
   // 1. Fetch Users List
   const fetchLibraryUsers = async () => {
@@ -141,14 +171,14 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
             {/* <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Manage library subscriptions, track attendance, and analyze engagement.</p> */}
           </div>
 
-          {/* <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-sm font-medium">
               <Download className="w-4 h-4" /> Export CSV
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-500/20 transition-all text-sm font-medium active:scale-95">
-              <Plus className="w-4 h-4" /> Add Member
+            <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-lg shadow-purple-500/20 transition-all text-sm font-medium active:scale-95">
+              <Plus className="w-4 h-4" /> Add Student
             </button>
-          </div> */}
+          </div>
         </motion.header>
 
         {/* --- STATISTICS ROW --- */}
@@ -252,6 +282,97 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
             }}
             onClose={() => { setUserAnalytics(null); setSelectedUser(null); }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Add Student Direct Modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl max-w-md w-full p-6 text-gray-900 dark:text-white"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <Plus className="text-purple-500" size={20} /> Add New Student
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Direct onboarding: Bypasses email OTP and rate limits</p>
+                </div>
+                <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition">✕</button>
+              </div>
+
+              <form onSubmit={handleCreateStudent} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. John Doe"
+                    value={newStudent.name}
+                    onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                    className="w-full p-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="student@example.com"
+                    value={newStudent.email}
+                    onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                    className="w-full p-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Password * (Min 6 chars)</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="Create a password..."
+                    value={newStudent.password}
+                    onChange={(e) => setNewStudent({ ...newStudent, password: e.target.value })}
+                    className="w-full p-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Phone Number (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="+91 9876543210"
+                    value={newStudent.phone}
+                    onChange={(e) => setNewStudent({ ...newStudent, phone: e.target.value })}
+                    className="w-full p-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-sm font-medium transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addingStudent}
+                    className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 shadow-lg shadow-purple-500/20"
+                  >
+                    {addingStudent ? 'Creating...' : 'Add Student'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

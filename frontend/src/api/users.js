@@ -6,6 +6,12 @@ export const getAllUsers = async (params = {}) => {
     return response.data;
 };
 
+// Create user / Add student (Admin/Co-Admin/Library Owner)
+export const createUser = async (userData) => {
+    const response = await axiosClient.post('/auth/users', userData);
+    return response.data;
+};
+
 // Update user (Admin/Co-Admin only)
 export const updateUser = async (id, userData) => {
     const response = await axiosClient.put(`/auth/users/${id}`, userData);

@@ -35,16 +35,24 @@ const seatSchema = new Schema({
         default: 'Available'
     },
 
-    // Reservation Details
+    // Recurring Reservation Schedule (multi-user, multi-slot)
+    reservations: [{
+        userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        startTime: { type: String, required: true },  // "HH:MM" e.g. "10:00"
+        endTime: { type: String, required: true },     // "HH:MM" e.g. "14:00"
+        createdAt: { type: Date, default: Date.now }
+    }],
+
+    // --- DEPRECATED: kept temporarily for backward compat migration ---
     reservedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     reservationType: {
         type: String,
-        enum: ['FullDay', 'TimeSlot'],
+        enum: ['FullDay', 'TimeSlot', null],
         default: null
     },
     reservedTimeSlots: [{
-        startTime: String, // e.g., "10:00"
-        endTime: String    // e.g., "14:00"
+        startTime: String,
+        endTime: String
     }],
     reservationDate: { type: Date, default: null }
 }, { timestamps: true });

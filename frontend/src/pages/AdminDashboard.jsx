@@ -36,6 +36,9 @@ function AdminDashboard() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', phone: '', role: 'User' });
+    const [creatingUser, setCreatingUser] = useState(false);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -302,6 +305,31 @@ function AdminDashboard() {
         }
     };
 
+    const handleCreateUser = async (e) => {
+        e.preventDefault();
+        if (!newUserData.name || !newUserData.email || !newUserData.password) {
+            toast.error("Name, email and password are required");
+            return;
+        }
+        if (newUserData.password.length < 6) {
+            toast.error("Password must be at least 6 characters");
+            return;
+        }
+
+        try {
+            setCreatingUser(true);
+            const res = await userApi.createUser(newUserData);
+            toast.success(res.message || "User created successfully!");
+            setShowAddModal(false);
+            setNewUserData({ name: '', email: '', password: '', phone: '', role: 'User' });
+            fetchUsers(1);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to create user");
+        } finally {
+            setCreatingUser(false);
+        }
+    };
+
     const handleUpdateClick = (u) => {
         setSelectedUser(u);
         reset();
@@ -489,6 +517,22 @@ function AdminDashboard() {
                            ========================================== */}
                         {activeTab === "users" && (
                             <div className="space-y-6">
+                                {/* Header Bar */}
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl shadow-xl">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <Users className="text-purple-400" size={20} /> User Accounts & Students
+                                        </h3>
+                                        <p className="text-xs text-gray-400 mt-1">Directly onboard students or manage account permissions without rate limits</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowAddModal(true)}
+                                        className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl shadow-lg shadow-purple-500/20 text-sm font-semibold flex items-center gap-2 transition active:scale-95"
+                                    >
+                                        <Plus size={16} /> Add Student / User
+                                    </button>
+                                </div>
+
                                 {/* Filters */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl shadow-xl">
                                     <div>
@@ -1173,6 +1217,111 @@ function AdminDashboard() {
                                     <button type="button" onClick={() => setShowUpdateModal(false)} className="flex-1 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-sm">Cancel</button>
                                     <button type="submit" disabled={isSubmitting} className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
                                         {isSubmitting ? "Saving changes..." : "Save Configuration"}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Direct Add User / Student Modal */}
+            <AnimatePresence>
+                {showAddModal && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-[#0F0F12] border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full my-8 p-6"
+                        >
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <Plus className="text-purple-400" size={20} /> Add Student / User
+                                    </h3>
+                                    <p className="text-xs text-gray-400 mt-1">Direct onboarding: Bypasses email OTP and rate limits</p>
+                                </div>
+                                <button onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-white transition">✕</button>
+                            </div>
+
+                            <form onSubmit={handleCreateUser} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-400 mb-1">Full Name *</label>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        placeholder="e.g. John Doe"
+                                        value={newUserData.name} 
+                                        onChange={(e) => setNewUserData({ ...newUserData, name: e.target.value })}
+                                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-white focus:border-purple-500 focus:outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-400 mb-1">Email Address *</label>
+                                    <input 
+                                        type="email" 
+                                        required
+                                        placeholder="student@example.com"
+                                        value={newUserData.email} 
+                                        onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-white focus:border-purple-500 focus:outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-400 mb-1">Password * (Min 6 chars)</label>
+                                    <input 
+                                        type="password" 
+                                        required
+                                        minLength={6}
+                                        placeholder="Enter password..."
+                                        value={newUserData.password} 
+                                        onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-white focus:border-purple-500 focus:outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-400 mb-1">Phone Number (Optional)</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="+91 9876543210"
+                                        value={newUserData.phone} 
+                                        onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
+                                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-white focus:border-purple-500 focus:outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-400 mb-1">Role</label>
+                                    <select 
+                                        value={newUserData.role} 
+                                        onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
+                                        className="w-full p-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-gray-300 focus:border-purple-500 focus:outline-none"
+                                    >
+                                        <option value="User">Student / User</option>
+                                        <option value="co-admin">Co-Admin</option>
+                                        <option value="library_owner">Library Owner</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-white/5">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowAddModal(false)} 
+                                        className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-medium transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={creatingUser}
+                                        className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50"
+                                    >
+                                        {creatingUser ? 'Creating...' : 'Create Account'}
                                     </button>
                                 </div>
                             </form>

@@ -41,6 +41,7 @@ export const checkOut = async () => {
 
 export const reserveSeat = async (seatId, reservationData) => {
     try {
+        // reservationData: { userId, startTime, endTime }
         const response = await api.post(`/seats/${seatId}/reserve`, reservationData);
         return response.data;
     } catch (error) {
@@ -48,9 +49,12 @@ export const reserveSeat = async (seatId, reservationData) => {
     }
 };
 
-export const cancelReservation = async (seatId) => {
+export const cancelReservation = async (seatId, reservationIndex) => {
     try {
-        const response = await api.post(`/seats/${seatId}/cancel-reservation`);
+        // Send reservationIndex in body for targeted cancellation
+        const response = await api.post(`/seats/${seatId}/cancel-reservation`, {
+            reservationIndex: reservationIndex !== undefined ? reservationIndex : null
+        });
         return response.data;
     } catch (error) {
         throw error;

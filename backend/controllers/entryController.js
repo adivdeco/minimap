@@ -257,36 +257,23 @@ exports.checkIn = async (req, res) => {
         if (activeSub) {
             // First, see if they have a reserved seat right now
             const today = new Date();
-            const todayMidnight = new Date(today);
-            todayMidnight.setHours(0, 0, 0, 0);
-
             const currentTimeStr = today.toTimeString().substring(0, 5); // "HH:MM"
 
+            // Search for a seat with a reservation matching this user at the current time
+            // Uses new reservations[] subdocument array
             const userReservedSeat = await Seat.findOne({
                 libraryId: library._id,
-                status: 'Reserved',
-                reservedBy: userId
-            }).session(session);
-
-            let isReservedForNow = false;
-
-            if (userReservedSeat) {
-                if (userReservedSeat.reservationType === 'FullDay') {
-                    // FullDay now means permanent until cancelled
-                    isReservedForNow = true;
-                } else if (userReservedSeat.reservationType === 'TimeSlot') {
-                    // TimeSlot is now a permanently recurring daily reservation
-                    for (const slot of userReservedSeat.reservedTimeSlots) {
-                        if (currentTimeStr >= slot.startTime && currentTimeStr <= slot.endTime) {
-                            isReservedForNow = true;
-                            break;
-                        }
+                'reservations': {
+                    $elemMatch: {
+                        userId: userId,
+                        startTime: { $lte: currentTimeStr },
+                        endTime: { $gte: currentTimeStr }
                     }
                 }
-            }
+            }).session(session);
 
             let resultData;
-            if (isReservedForNow) {
+            if (userReservedSeat) {
                 resultData = await assignSeat(library, userId, activeSub, dailyStats, session, userReservedSeat);
             } else {
                 resultData = await assignSeat(library, userId, activeSub, dailyStats, session);
@@ -420,7 +407,7 @@ exports.checkOut = async (req, res) => {
 
         // 3. Release Seat
         let newStatus = 'Available';
-        if (seat.reservedBy && seat.reservationType) {
+        if (seat.reservations && seat.reservations.length > 0) {
             newStatus = 'Reserved';
         }
 
@@ -763,7 +750,7 @@ const releaseExpiredSeats = async () => {
 
                 // Determine Seat Status
                 let nextStatus = 'Available';
-                if (seat.reservedBy && seat.reservationType) {
+                if (seat.reservations && seat.reservations.length > 0) {
                     nextStatus = 'Reserved'; // Restore reservation
                 }
 

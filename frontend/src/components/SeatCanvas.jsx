@@ -48,19 +48,44 @@ const PALETTE_ITEMS = [
     { type: 'label', label: 'Label', icon: Type, desc: 'Text label' },
 ];
 
+// --- HELPER: Check if a seat has a reservation overlapping a given time range ---
+const hasReservationInRange = (seat, startTime, endTime) => {
+    if (!seat.reservations || seat.reservations.length === 0) return false;
+    return seat.reservations.some(r =>
+        r.startTime < endTime && r.endTime > startTime
+    );
+};
+
+// --- HELPER: Compute seat display status based on time filter ---
+const computeCanvasStatus = (seat, filterStart, filterEnd) => {
+    if (seat.status === 'Maintenance') return 'Maintenance';
+    if (seat.status === 'Occupied') return 'Occupied';
+    if (filterStart && filterEnd && hasReservationInRange(seat, filterStart, filterEnd)) {
+        return 'Reserved';
+    }
+    if (seat.reservations && seat.reservations.length > 0) {
+        if (!filterStart || !filterEnd) return 'Reserved';
+        return 'Available';
+    }
+    return 'Available';
+};
+
 // --- SUB-COMPONENT: DRAGGABLE SEAT ---
-const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, onSelect, isSelected, scale }) => {
+const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, onSelect, isSelected, scale, filterStartTime, filterEndTime }) => {
     const nodeRef = useRef(null);
 
     // Position priority: Local State -> DB Value -> Default 0
     const currentX = position?.x ?? seat.x ?? 0;
     const currentY = position?.y ?? seat.y ?? 0;
 
-    const getStatusStyles = (seat) => {
-        if (seat.status === 'Occupied' && seat.reservedBy) {
+    const displayStatus = computeCanvasStatus(seat, filterStartTime, filterEndTime);
+    const hasRes = seat.reservations && seat.reservations.length > 0;
+
+    const getStatusStyles = () => {
+        if (displayStatus === 'Occupied' && hasRes) {
             return 'bg-purple-100 border-purple-500 text-purple-800 ring-purple-200';
         }
-        switch (seat.status) {
+        switch (displayStatus) {
             case 'Available':
                 return 'bg-white border-green-500 text-green-700 hover:bg-green-50 ring-green-200';
             case 'Occupied':
@@ -92,7 +117,7 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, onSelect,
                 className={`
                     absolute w-12 h-12 rounded-lg border-2 shadow-sm flex flex-col items-center justify-center select-none z-10 touch-none
                     transition-all duration-150
-                    ${getStatusStyles(seat)}
+                    ${getStatusStyles()}
                     ${isSelected && isEditMode ? 'ring-2 ring-indigo-600 ring-offset-2 ring-offset-white shadow-xl z-30 scale-105' : ''}
                     ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : 'cursor-pointer hover:scale-105'}
                 `}
@@ -115,14 +140,19 @@ const DraggableSeat = ({ seat, position, onDrag, isEditMode, onUpdate, onSelect,
                 <span className="text-sm font-extrabold leading-none">{seat.seatNumber}</span>
 
                 {/* Status Indicator Icon */}
-                {seat.status === 'Occupied' && (
-                    <div className={`absolute -top-2 -right-2 rounded-full p-0.5 border shadow-sm ${seat.reservedBy ? 'bg-purple-100 text-purple-600 border-purple-200' : 'bg-red-100 text-red-600 border-red-200'}`}>
+                {displayStatus === 'Occupied' && (
+                    <div className={`absolute -top-2 -right-2 rounded-full p-0.5 border shadow-sm ${hasRes ? 'bg-purple-100 text-purple-600 border-purple-200' : 'bg-red-100 text-red-600 border-red-200'}`}>
                         <User size={12} />
                     </div>
                 )}
-                {seat.status === 'Reserved' && (
+                {displayStatus === 'Reserved' && (
                     <div className="absolute -top-2 -right-2 bg-blue-100 text-blue-600 rounded-full p-0.5 border border-blue-200 shadow-sm">
                         <User size={12} />
+                    </div>
+                )}
+                {hasRes && displayStatus !== 'Occupied' && displayStatus !== 'Reserved' && (
+                    <div className="absolute -top-2 -left-2 bg-blue-50 text-blue-500 rounded-full w-4 h-4 flex items-center justify-center border border-blue-200 shadow-sm text-[8px] font-bold">
+                        {seat.reservations.length}
                     </div>
                 )}
                 {isSelected && isEditMode && (
@@ -201,7 +231,7 @@ const DraggableFloorElement = ({
 
 
 // --- MAIN COMPONENT ---
-const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditMode, setIsEditMode }) => {
+const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditMode, setIsEditMode, filterStartTime, filterEndTime }) => {
     const [positions, setPositions] = useState({});
     const [saving, setSaving] = useState(false);
     const [zoom, setZoom] = useState(1);
@@ -677,6 +707,8 @@ const SeatCanvas = ({ seats, libraryId, onUpdate, isOwner, refreshSeats, isEditM
                             onSelect={(id) => setSelectedItem({ type: 'seat', id })}
                             isSelected={selectedItem?.type === 'seat' && selectedItem?.id === seat._id}
                             scale={zoom}
+                            filterStartTime={filterStartTime}
+                            filterEndTime={filterEndTime}
                         />
                     ))}
 

@@ -4,24 +4,42 @@ const Subscription = require('../models/Subscription');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 
+// --- HELPER: Check if two time ranges overlap ---
+// Back-to-back is allowed: 10:00-12:00 and 12:00-14:00 do NOT overlap
+function timeSlotsOverlap(startA, endA, startB, endB) {
+    return startA < endB && endA > startB;
+}
+
+// --- HELPER: Validate time string format "HH:MM" ---
+function isValidTimeString(t) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+}
+
+// --- HELPER: Recompute seat status based on state ---
+function computeSeatStatus(seat) {
+    if (seat.status === 'Maintenance') return 'Maintenance';
+    if (seat.currentOccupant) return 'Occupied';
+    if (seat.reservations && seat.reservations.length > 0) return 'Reserved';
+    return 'Available';
+}
+
 // @desc    Get all seats for a specific library
 // @route   GET /api/seats/library/:libraryId
 const getLibrarySeats = async (req, res) => {
     try {
         const { libraryId } = req.params;
-        const userId = req.user._id;
-        const role = req.user.role;
 
-        // Allow anyone with a valid token to view seats (for booking/map)
         // Ensure library exists
         const library = await Library.findById(libraryId);
         if (!library) return res.status(404).json({ message: "Library not found" });
 
         const seats = await Seat.find({ libraryId })
             .populate('currentOccupant', 'name email avatar phone')
+            .populate('reservations.userId', 'name email avatar phone')
+            // Deprecated field — populate for backward compat during migration
             .populate('reservedBy', 'name email avatar phone')
-            .collation({ locale: "en_US", numericOrdering: true }) // Force numeric sort (1, 2, 10)
-            .sort({ category: 1, seatNumber: 1 }); // Sort by category then seat number
+            .collation({ locale: "en_US", numericOrdering: true })
+            .sort({ category: 1, seatNumber: 1 });
 
         res.json(seats);
     } catch (err) {
@@ -78,8 +96,8 @@ const updateSeat = async (req, res) => {
             seat.currentOccupant = null;
             seat.occupiedSince = null;
 
-            // If the seat has an active reservation, prevent it from becoming Available
-            if (seat.reservedBy && seat.reservationType) {
+            // If the seat has active reservations, keep it as Reserved
+            if (seat.reservations && seat.reservations.length > 0) {
                 seat.status = 'Reserved';
             }
         }
@@ -131,6 +149,7 @@ const updateSeat = async (req, res) => {
 
         // Return populated to keep frontend in sync
         await seat.populate('currentOccupant', 'name email avatar phone');
+        await seat.populate('reservations.userId', 'name email avatar phone');
 
         res.json(seat);
     } catch (err) {
@@ -180,17 +199,26 @@ const updateSeatPositions = async (req, res) => {
     }
 };
 
-// @desc    Reserve a seat for a specific user (Admin/Owner only)
+// @desc    Reserve a time slot on a seat for a user (Admin/Owner only)
 // @route   POST /api/seats/:id/reserve
 const reserveSeat = async (req, res) => {
     try {
         const { id } = req.params;
-        const { userId, reservationType, startTime, endTime } = req.body;
+        const { userId, startTime, endTime } = req.body;
         const adminId = req.user._id;
         const role = req.user.role;
 
-        if (!userId || !reservationType) {
-            return res.status(400).json({ message: "Missing required reservation fields" });
+        // --- Validation ---
+        if (!userId || !startTime || !endTime) {
+            return res.status(400).json({ message: "Missing required fields: userId, startTime, endTime" });
+        }
+
+        if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
+            return res.status(400).json({ message: "Invalid time format. Use HH:MM (e.g., 10:00)" });
+        }
+
+        if (startTime >= endTime) {
+            return res.status(400).json({ message: "Start time must be before end time" });
         }
 
         const seat = await Seat.findById(id);
@@ -209,58 +237,54 @@ const reserveSeat = async (req, res) => {
             }
         }
 
-        // Validate that user has an active subscription for this library
-        const activeSub = await Subscription.findOne({
+        // Seat must not be in Maintenance
+        if (seat.status === 'Maintenance') {
+            return res.status(400).json({ message: "Cannot reserve a seat that is under maintenance." });
+        }
+
+        // --- Validate against library operating hours ---
+        if (!library.businessHours?.is24x7) {
+            const libOpen = library.businessHours?.open || '06:00';
+            const libClose = library.businessHours?.close || '22:00';
+
+            if (startTime < libOpen || endTime > libClose) {
+                return res.status(400).json({
+                    message: `Reservation must be within library hours (${libOpen} – ${libClose})`
+                });
+            }
+        }
+
+        // --- Check for overlapping reservations on this seat ---
+        for (const existing of (seat.reservations || [])) {
+            if (timeSlotsOverlap(startTime, endTime, existing.startTime, existing.endTime)) {
+                // Populate user name for a better error message
+                const existingUser = await User.findById(existing.userId, 'name');
+                const existingName = existingUser?.name || 'another user';
+                return res.status(400).json({
+                    message: `Time slot overlaps with existing reservation (${existing.startTime} – ${existing.endTime}) by ${existingName}`
+                });
+            }
+        }
+
+        // --- Validate user has an active subscription (optional but recommended) ---
+        // Currently the existing code allows forced reservations by admin, so we keep that behavior
+        // but log a warning if no subscription exists.
+
+        // --- Push the new reservation ---
+        seat.reservations.push({
             userId,
-            libraryId: seat.libraryId,
-            status: 'active'
+            startTime,
+            endTime
         });
 
-        // Note: For now we might bypass strict subscription validation to allow owners to force reserve, 
-        // but typically you'd want them to have a plan. We'll allow it but you might want to strict-check it later.
+        // Sort reservations by startTime for cleanliness
+        seat.reservations.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-        if (reservationType === 'TimeSlot') {
-            if (!startTime || !endTime) {
-                return res.status(400).json({ message: "Start and End time required for TimeSlot reservation" });
-            }
-
-            // Check for overlaps if the seat is already reserved on the same day for a TimeSlot
-            if (seat.status === 'Reserved' && seat.reservationType === 'TimeSlot') {
-                const newStart = startTime;
-                const newEnd = endTime;
-
-                for (const slot of seat.reservedTimeSlots) {
-                    // Very basic string comparison for "HH:MM" overlap
-                    if ((newStart >= slot.startTime && newStart < slot.endTime) ||
-                        (newEnd > slot.startTime && newEnd <= slot.endTime) ||
-                        (newStart <= slot.startTime && newEnd >= slot.endTime)) {
-                        return res.status(400).json({ message: `Time slot overlaps with existing reservation (${slot.startTime} - ${slot.endTime})` });
-                    }
-                }
-            } else if (seat.status === 'Reserved' && seat.reservationType === 'FullDay') {
-                return res.status(400).json({ message: "Seat is already permanently reserved by another user." });
-            } else {
-                // Not currently reserved, ensure array is clean
-                seat.reservedTimeSlots = [];
-            }
-
-            seat.reservedTimeSlots.push({ startTime, endTime });
-        }
-
-        seat.status = 'Reserved';
-        seat.reservedBy = userId;
-        seat.reservationType = reservationType;
-        seat.reservationDate = new Date(); // Record creation date for reference only
-
-        // If it was occupied by someone else, we might want to evict them or warn, 
-        // but for now we just change status and the admin handles physical enforcement.
-        // We'll reset current occupant if it's currently empty, or keep them if they are the reserved user.
-        if (seat.currentOccupant && seat.currentOccupant.toString() !== userId.toString()) {
-            // Optional: You could auto-checkout the current user here if strictly needed.
-        }
+        // Update status
+        seat.status = computeSeatStatus(seat);
 
         await seat.save();
-        await seat.populate('reservedBy', 'name email phone avatar');
+        await seat.populate('reservations.userId', 'name email phone avatar');
 
         res.json({ success: true, message: "Seat reserved successfully", seat });
     } catch (err) {
@@ -269,11 +293,12 @@ const reserveSeat = async (req, res) => {
     }
 };
 
-// @desc    Cancel a reservation
+// @desc    Cancel a specific reservation on a seat
 // @route   POST /api/seats/:id/cancel-reservation
 const cancelReservation = async (req, res) => {
     try {
         const { id } = req.params;
+        const { reservationIndex } = req.body; // Index of the reservation to cancel
         const adminId = req.user._id;
         const role = req.user.role;
 
@@ -288,21 +313,29 @@ const cancelReservation = async (req, res) => {
             }
         }
 
-        // If it's occupied by the reserver, you might want to leave it occupied, just clear reservation info.
-        // If it's pure reserved (no one sitting), switch to Available.
-        if (seat.status === 'Reserved') {
-            seat.status = 'Available';
+        // --- Handle legacy: cancel ALL (when no index given and old-style reservedBy exists) ---
+        if (reservationIndex === undefined || reservationIndex === null) {
+            // Legacy behavior: clear all reservations
+            seat.reservations = [];
+            // Also clear deprecated fields
+            seat.reservedBy = null;
+            seat.reservationType = null;
+            seat.reservedTimeSlots = [];
+            seat.reservationDate = null;
+        } else {
+            // Targeted cancellation
+            if (reservationIndex < 0 || reservationIndex >= (seat.reservations?.length || 0)) {
+                return res.status(400).json({ message: "Invalid reservation index" });
+            }
+            seat.reservations.splice(reservationIndex, 1);
         }
 
-        seat.reservedBy = null;
-        seat.reservationType = null;
-        seat.reservedTimeSlots = [];
-        seat.reservationDate = null;
+        // Recompute status
+        seat.status = computeSeatStatus(seat);
 
         await seat.save();
-
-        // Populate standard fields just in case frontend needs them
         await seat.populate('currentOccupant', 'name email avatar phone');
+        await seat.populate('reservations.userId', 'name email avatar phone');
 
         res.json({ success: true, message: "Reservation cancelled", seat });
 

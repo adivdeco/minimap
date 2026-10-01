@@ -7,6 +7,7 @@ const {
     logoutUser,
     checkSession,
     allUsers,
+    createUser,
     updateUser,
     deleteUser,
     updateProfile,
@@ -26,8 +27,9 @@ router.post('/logout', logoutUser);
 // Protected routes
 router.get('/check-session', checkSession);
 
-// User management routes (Admin/Co-Admin)
+// User management routes (Admin/Co-Admin/Library Owner)
 router.get('/users', authMiddleware, allUsers);
+router.post('/users', authMiddleware, createUser);
 router.put('/users/:id', authMiddleware, updateUser);
 router.delete('/users/:id', authMiddleware, deleteUser);
 
