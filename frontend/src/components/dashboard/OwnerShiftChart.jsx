@@ -30,7 +30,7 @@ export function OwnerShiftChart({ libraryId }) {
   const [chartData, setChartData] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [totalVisitors, setTotalVisitors] = React.useState(0)
-  
+
   // Date state initialized to today
   const [selectedDate, setSelectedDate] = React.useState(new Date())
 
@@ -102,9 +102,9 @@ export function OwnerShiftChart({ libraryId }) {
               Visitor distribution by daily shifts
             </CardDescription>
           </div>
-          
+
           <div className="flex items-center space-x-1 sm:space-x-2 bg-slate-100 dark:bg-slate-800 rounded-full p-1 mt-0">
-            <button 
+            <button
               onClick={handlePrevDay}
               className="p-1 sm:p-1.5 rounded-full hover:bg-white dark:hover:bg-slate-700 transition-colors"
               aria-label="Previous Day"
@@ -114,7 +114,7 @@ export function OwnerShiftChart({ libraryId }) {
             <span className="text-[11px] sm:text-sm font-medium w-16 sm:w-32 text-center text-slate-700 dark:text-slate-200 uppercase sm:capitalize whitespace-nowrap overflow-hidden text-ellipsis">
               {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </span>
-            <button 
+            <button
               onClick={handleNextDay}
               disabled={isFutureDate()}
               className={`p-1 sm:p-1.5 rounded-full transition-colors ${isFutureDate() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white dark:hover:bg-slate-700'}`}
@@ -125,69 +125,69 @@ export function OwnerShiftChart({ libraryId }) {
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="flex-1 pb-0 px-2 sm:px-6 bg-slate-50/50 dark:bg-black/20 pt-6">
         {loading ? (
-             <div className="h-[250px] w-full flex items-center justify-center">
-                 <div className="animate-spin w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent"></div>
-             </div>
+          <div className="h-[250px] w-full flex items-center justify-center">
+            <div className="animate-spin w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+          </div>
         ) : (
-             chartData.length === 0 || totalVisitors === 0 ? (
-                <div className="h-[250px] flex flex-col items-center justify-center text-muted-foreground text-center px-4">
-                    <p>No shift data for this day.</p>
-                </div>
-            ) : (
-                <ChartContainer
-                config={chartConfig}
-                className="mx-auto aspect-square max-h-[300px] w-full"
-                >
-                <RadarChart data={chartData} margin={{ top: -50, right: 30, bottom: 20, left: 30 }}>
-                    <ChartTooltip 
-                        cursor={false} 
-                        content={<ChartTooltipContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 shadow-lg !text-slate-900 dark:!text-white" />} 
-                    />
-                    <PolarAngleAxis 
-                        dataKey="shift" 
-                        tick={{ fill: "currentColor", fontSize: 11 }}
-                        className="text-slate-600 dark:text-slate-400"
-                    />
-                    <PolarGrid stroke="var(--border)" strokeOpacity={0.5} />
-                    <defs>
-                        <linearGradient id="glassGlossRadar" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9}/>
-                            <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.6}/>
-                            <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                        </linearGradient>
+          chartData.length === 0 || totalVisitors === 0 ? (
+            <div className="h-[250px] flex flex-col items-center justify-center text-muted-foreground text-center px-4">
+              <p>No shift data for this day.</p>
+            </div>
+          ) : (
+            <ChartContainer
+              config={chartConfig}
+              className="mx-auto aspect-square max-h-[300px] w-full"
+            >
+              <RadarChart data={chartData} margin={{ top: -50, right: 30, bottom: 20, left: 30 }}>
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 shadow-lg !text-slate-900 dark:!text-white" />}
+                />
+                <PolarAngleAxis
+                  dataKey="shift"
+                  tick={{ fill: "currentColor", fontSize: 11 }}
+                  className="text-slate-600 dark:text-slate-400"
+                />
+                <PolarGrid stroke="var(--border)" strokeOpacity={0.5} />
+                <defs>
+                  <linearGradient id="glassGlossRadar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
+                    <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.6} />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                  </linearGradient>
 
-                        <filter id="glassTextureRadar" x="-20%" y="-20%" width="140%" height="140%">
-                            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
-                            <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
-                            <feComposite operator="in" in="coloredNoise" in2="SourceGraphic" result="texture" />
-                            <feBlend mode="overlay" in="texture" in2="SourceGraphic" result="glassBase" />
-                        </filter>
-                    </defs>
-                    <Radar
-                        dataKey="visitors"
-                        fill="url(#glassGlossRadar)"
-                        stroke="#8b5cf6"
-                        strokeWidth={2}
-                        filter="url(#glassTextureRadar)"
-                        dot={{
-                            r: 5,
-                            fill: "#8b5cf6",
-                            stroke: "white",
-                            strokeWidth: 2,
-                            fillOpacity: 1,
-                        }}
-                        activeDot={{
-                            r: 7,
-                            strokeWidth: 0
-                        }}
-                        className="drop-shadow-[0_8px_16px_rgba(139,92,246,0.3)] transition-all duration-300"
-                    />
-                </RadarChart>
-                </ChartContainer>
-            )
+                  <filter id="glassTextureRadar" x="-20%" y="-20%" width="140%" height="140%">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
+                    <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" in="noise" result="coloredNoise" />
+                    <feComposite operator="in" in="coloredNoise" in2="SourceGraphic" result="texture" />
+                    <feBlend mode="overlay" in="texture" in2="SourceGraphic" result="glassBase" />
+                  </filter>
+                </defs>
+                <Radar
+                  dataKey="visitors"
+                  fill="url(#glassGlossRadar)"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  filter="url(#glassTextureRadar)"
+                  dot={{
+                    r: 5,
+                    fill: "#8b5cf6",
+                    stroke: "white",
+                    strokeWidth: 2,
+                    fillOpacity: 1,
+                  }}
+                  activeDot={{
+                    r: 7,
+                    strokeWidth: 0
+                  }}
+                  className="drop-shadow-[0_8px_16px_rgba(139,92,246,0.3)] transition-all duration-300"
+                />
+              </RadarChart>
+            </ChartContainer>
+          )
         )}
       </CardContent>
       <CardFooter className="flex-col sm:flex-row justify-between items-center gap-2 text-sm border-t border-slate-100 dark:border-white/5 py-3 sm:py-4 px-4 sm:px-6 bg-slate-50/80 dark:bg-black/40">

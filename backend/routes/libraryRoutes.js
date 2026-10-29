@@ -17,6 +17,7 @@ const {
     getUserAnalytics,
     getLibraryStatistics,
     updateUserContactInfo,
+    removeUserFromLibrary,
     getLibraryAttendanceChart,
     getLibraryShiftAnalytics,
     getLibraryAttendanceDayDetails
@@ -43,6 +44,7 @@ router.post('/generate-seats', authMiddleware, generateSeatsForLibrary);
 
 // Library Owner - User & Analytics Routes
 router.get('/:libraryId/users', authMiddleware, getLibraryUsers);
+router.delete('/:libraryId/user/:userId', authMiddleware, removeUserFromLibrary);
 router.get('/:libraryId/user/:userId/analytics', authMiddleware, getUserAnalytics);
 router.put('/:libraryId/user/:userId/contact', authMiddleware, updateUserContactInfo);
 router.get('/:libraryId/statistics', authMiddleware, getLibraryStatistics);

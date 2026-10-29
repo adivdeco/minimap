@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Library = require('../models/LibrarySchema');
 const Seat = require('../models/Seat');
 const User = require('../models/User');
@@ -5,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const Subscription = require('../models/Subscription');
 const Attendance = require('../models/Attendance');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // @desc    Add a new library (Admin/Co-Admin only)
 // @route   POST /api/library/add
@@ -1309,7 +1311,16 @@ const getLibraryStatistics = async (req, res) => {
         const expiredSubscriptions = allSubscriptions.filter(s => s.status === 'expired').length;
         const cancelledSubscriptions = allSubscriptions.filter(s => s.status === 'cancelled').length;
 
-        const totalRevenue = allSubscriptions.reduce((acc, sub) => acc + (sub.pricePaid || 0), 0);
+        // Calculate current month revenue (and all-time revenue)
+        const nowInKolkata = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        const startOfMonth = new Date(nowInKolkata.getFullYear(), nowInKolkata.getMonth(), 1, 0, 0, 0);
+
+        const currentMonthSubscriptions = allSubscriptions.filter(sub => {
+            const subDate = new Date(sub.startDate || sub.createdAt);
+            return subDate >= startOfMonth;
+        });
+        const currentMonthRevenue = currentMonthSubscriptions.reduce((acc, sub) => acc + (sub.pricePaid || 0), 0);
+        const allTimeRevenue = allSubscriptions.reduce((acc, sub) => acc + (sub.pricePaid || 0), 0);
 
         const todayVisitors = new Set(todayAttendance.map(a => a.userId.toString())).size;
         const todaySessions = todayAttendance.reduce((acc, record) => acc + record.sessionCount, 0);
@@ -1355,9 +1366,11 @@ const getLibraryStatistics = async (req, res) => {
                     : '0%'
             },
             financialMetrics: {
-                totalRevenue,
-                averageRevenuePerSubscription: allSubscriptions.length > 0
-                    ? Math.round((totalRevenue / allSubscriptions.length) * 100) / 100
+                totalRevenue: currentMonthRevenue,
+                currentMonthRevenue,
+                allTimeRevenue,
+                averageRevenuePerSubscription: currentMonthSubscriptions.length > 0
+                    ? Math.round((currentMonthRevenue / currentMonthSubscriptions.length) * 100) / 100
                     : 0
             },
             attendanceMetrics: {
@@ -1436,6 +1449,144 @@ const updateUserContactInfo = async (req, res) => {
             message: 'Internal server error',
             error: error.message
         });
+    }
+};
+
+// @desc    Remove a user completely from a library (Option 2: hard purge of subscriptions, release seats, clean studentDetails)
+// @route   DELETE /api/library/:libraryId/user/:userId
+const removeUserFromLibrary = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const callerId = req.user._id;
+        const callerRole = req.user.role;
+        const { libraryId, userId } = req.params;
+
+        const library = await Library.findById(libraryId).session(session);
+        if (!library) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(404).json({ message: "Library not found" });
+        }
+
+        const isOwner = library.ownerId.toString() === callerId.toString();
+        const isAdmin = callerRole === 'admin' || callerRole === 'co-admin';
+
+        if (!isAdmin && !isOwner) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(403).json({
+                message: "Forbidden: You do not have permission to remove members from this library"
+            });
+        }
+
+        // 1. Release any seat currently occupied by this user in this library
+        await Seat.updateMany(
+            { libraryId, currentOccupant: userId },
+            {
+                $set: {
+                    status: 'Available',
+                    currentOccupant: null,
+                    occupiedSince: null,
+                    expectedEndTime: null
+                }
+            },
+            { session }
+        );
+
+        // 2. Remove recurring reservations for this user from seats in this library
+        await Seat.updateMany(
+            { libraryId, 'reservations.userId': userId },
+            {
+                $pull: { reservations: { userId } }
+            },
+            { session }
+        );
+
+        // 3. Close any ongoing attendance sessions for this user in this library
+        const openAttendanceDocs = await Attendance.find({
+            userId,
+            libraryId,
+            'sessions.checkOutTime': null
+        }).session(session);
+
+        const now = new Date();
+        for (const doc of openAttendanceDocs) {
+            let modified = false;
+            for (const sess of doc.sessions) {
+                if (!sess.checkOutTime) {
+                    sess.checkOutTime = now;
+                    sess.sessionStatus = 'checked_out';
+                    sess.checkoutReason = 'user_removed';
+                    if (sess.checkInTime) {
+                        sess.durationMinutes = Math.max(0, Math.round((now - new Date(sess.checkInTime)) / 60000));
+                    }
+                    modified = true;
+                }
+            }
+            if (modified) {
+                doc.totalDurationToday = doc.sessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
+                doc.sessionCount = doc.sessions.filter(s => !!s.checkOutTime).length;
+                await doc.save({ session });
+            }
+        }
+
+        // 4. Hard delete all subscriptions for this user in this library
+        const deleteResult = await Subscription.deleteMany(
+            { userId, libraryId },
+            { session }
+        );
+
+        // 5. Clear studentDetails currentSubscription and assignedSeat if they belonged to this library
+        const user = await User.findById(userId).session(session);
+        if (user && user.studentDetails) {
+            let shouldSave = false;
+            if (
+                user.studentDetails.currentSubscription &&
+                user.studentDetails.currentSubscription.libraryId &&
+                user.studentDetails.currentSubscription.libraryId.toString() === libraryId.toString()
+            ) {
+                user.studentDetails.currentSubscription = null;
+                shouldSave = true;
+            }
+            if (
+                user.studentDetails.assignedSeat &&
+                user.studentDetails.assignedSeat.seatId
+            ) {
+                const seatDoc = await Seat.findById(user.studentDetails.assignedSeat.seatId).session(session);
+                if (seatDoc && seatDoc.libraryId.toString() === libraryId.toString()) {
+                    user.studentDetails.assignedSeat = null;
+                    shouldSave = true;
+                }
+            }
+            if (shouldSave) {
+                await user.save({ session });
+            }
+        }
+
+        if (typeof authMiddleware.invalidateUserCache === 'function') {
+            authMiddleware.invalidateUserCache(userId);
+        }
+
+        await session.commitTransaction();
+
+        res.status(200).json({
+            success: true,
+            message: "User successfully removed from library",
+            deletedSubscriptions: deleteResult.deletedCount
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        console.error('Error removing user from library:', error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to remove user from library",
+            error: error.message
+        });
+    } finally {
+        session.endSession();
     }
 };
 // @desc    Get detailed attendance chart data for a specific month
@@ -1779,6 +1930,7 @@ module.exports = {
     getUserAnalytics,
     getLibraryStatistics,
     updateUserContactInfo,
+    removeUserFromLibrary,
     getLibraryAttendanceChart,
     getLibraryShiftAnalytics,
     getLibraryAttendanceDayDetails

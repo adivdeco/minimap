@@ -120,6 +120,19 @@ function handleAppError(err, res, fallbackMsg = 'Server Error') {
     res.status(500).json({ success: false, msg: fallbackMsg });
 }
 
+
+function formatTime12h(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return timeStr || '';
+    const parts = timeStr.trim().split(':');
+    if (parts.length < 2) return timeStr;
+    const hours = parseInt(parts[0], 10);
+    const minutes = parts[1].padStart(2, '0');
+    if (isNaN(hours)) return timeStr;
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes} ${period}`;
+}
+
 // ============================================================
 // SHIFT BOUNDARY CALCULATION
 // ============================================================
@@ -127,23 +140,44 @@ function handleAppError(err, res, fallbackMsg = 'Server Error') {
 /**
  * Resolves the allowed-entry window and scheduled end time for a FIXED_SHIFT sub.
  *
- * Overnight shifts (endTime < startTime, e.g. 22:00-06:00) are detected by
+ * Overnight shifts (endTime <= startTime, e.g. 21:00-06:00) are detected by
  * comparing the HH:mm strings and wrapping the end into the next calendar day.
  *
  * @param {Object} shift    – subscription.shift embedded doc
  * @param {Date}   now      – current UTC instant
  * @param {string} tz       – library timezone
- * @returns {{ earliestEntry, scheduledStart, scheduledEnd, isWithinWindow, isBeforeWindow }}
+ * @returns {{ earliestEntry, scheduledStart, scheduledEnd, isWithinWindow, isBeforeWindow, isAfterWindow }}
  */
 function resolveShiftBoundaries(shift, now, tz) {
     const localDateStr = now.toLocaleDateString('en-CA', { timeZone: tz });
+    const isOvernight = shift.endTime <= shift.startTime;
 
-    const scheduledStart = shiftTimeToUTC(shift.startTime, localDateStr, tz);
-    let scheduledEnd   = shiftTimeToUTC(shift.endTime,   localDateStr, tz);
+    let scheduledStart, scheduledEnd;
 
-    // Handle overnight: if end ≤ start (same calendar day), shift ends next day
-    if (scheduledEnd <= scheduledStart) {
-        scheduledEnd = new Date(scheduledEnd.getTime() + 24 * 60 * 60 * 1000);
+    if (isOvernight) {
+        // Shift crosses midnight, e.g. 21:00 to 06:00
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const yesterdayDateStr = yesterday.toLocaleDateString('en-CA', { timeZone: tz });
+
+        const startYesterday = shiftTimeToUTC(shift.startTime, yesterdayDateStr, tz);
+        const endYesterday   = shiftTimeToUTC(shift.endTime,   localDateStr, tz);
+
+        const startToday = shiftTimeToUTC(shift.startTime, localDateStr, tz);
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const tomorrowDateStr = tomorrow.toLocaleDateString('en-CA', { timeZone: tz });
+        const endToday = shiftTimeToUTC(shift.endTime, tomorrowDateStr, tz);
+
+        // If now is before or at yesterday's shift end (e.g. at 02:00 morning for a 21:00-06:00 shift)
+        if (now <= endYesterday) {
+            scheduledStart = startYesterday;
+            scheduledEnd   = endYesterday;
+        } else {
+            scheduledStart = startToday;
+            scheduledEnd   = endToday;
+        }
+    } else {
+        scheduledStart = shiftTimeToUTC(shift.startTime, localDateStr, tz);
+        scheduledEnd   = shiftTimeToUTC(shift.endTime,   localDateStr, tz);
     }
 
     // How early the student may arrive (early-entry grace)
@@ -151,9 +185,10 @@ function resolveShiftBoundaries(shift, now, tz) {
     const earliestEntry = new Date(scheduledStart.getTime() - earlyMs);
 
     const isBeforeWindow = now < earliestEntry;
-    const isWithinWindow = now >= earliestEntry && now <= scheduledEnd;
+    const isAfterWindow  = now >= scheduledEnd;
+    const isWithinWindow = now >= earliestEntry && now < scheduledEnd;
 
-    return { earliestEntry, scheduledStart, scheduledEnd, isWithinWindow, isBeforeWindow };
+    return { earliestEntry, scheduledStart, scheduledEnd, isWithinWindow, isBeforeWindow, isAfterWindow };
 }
 
 // ============================================================
@@ -192,28 +227,33 @@ async function assignSeat(library, userId, subscription, dailyStats, session, re
         }
 
         const { shift } = subscription;
-        const { earliestEntry, scheduledStart: ss, scheduledEnd: se, isWithinWindow, isBeforeWindow } =
+        const { earliestEntry, scheduledStart: ss, scheduledEnd: se, isBeforeWindow, isAfterWindow } =
             resolveShiftBoundaries(shift, now, tz);
 
         if (isBeforeWindow) {
             const minutesUntil = Math.ceil((earliestEntry.getTime() - now.getTime()) / 60000);
             throw new AppError(
-                `Your shift (${shift.name}) does not start until ${shift.startTime}. ` +
+                `Your shift (${shift.name}) does not start until ${formatTime12h(shift.startTime)}. ` +
                 `Early entry is permitted from ${shift.earlyEntryGraceMinutes} minutes before. ` +
                 `Please wait ${minutesUntil} more minute(s).`,
                 403, 'BEFORE_SHIFT'
             );
         }
 
-        if (!isWithinWindow) {
-            // Now is after scheduledEnd
-            if (!shift.allowLateEntry) {
-                throw new AppError(
-                    `Your shift (${shift.name}) ended at ${shift.endTime}. Late entry is not permitted.`,
-                    403, 'SHIFT_ENDED'
-                );
-            }
-            // Late entry is allowed – student still gets the scheduled end time
+        // Shift is finished for today: entry is strictly closed
+        if (isAfterWindow || now >= se) {
+            throw new AppError(
+                `Your shift (${shift.name}) ended at ${formatTime12h(shift.endTime)}. Entry is closed for this shift today.`,
+                403, 'SHIFT_ENDED'
+            );
+        }
+
+        // Arrived after shift start time: check if late entry is permitted
+        if (now > ss && !shift.allowLateEntry) {
+            throw new AppError(
+                `Your shift (${shift.name}) started at ${formatTime12h(shift.startTime)}. Late entry is not permitted.`,
+                403, 'LATE_ENTRY_DENIED'
+            );
         }
 
         scheduledStart  = ss;
@@ -252,7 +292,7 @@ async function assignSeat(library, userId, subscription, dailyStats, session, re
     let seat;
     if (reservedSeatDoc) {
         seat = await Seat.findOneAndUpdate(
-            { _id: reservedSeatDoc._id, status: 'Reserved' },
+            { _id: reservedSeatDoc._id, status: { $in: ['Reserved', 'Available'] } },
             {
                 $set: {
                     status: 'Occupied',
@@ -263,7 +303,7 @@ async function assignSeat(library, userId, subscription, dailyStats, session, re
             },
             { new: true, session }
         );
-        if (!seat) throw new AppError('Could not claim reserved seat. It might no longer be reserved.', 409, 'RACE');
+        if (!seat) throw new AppError('Could not claim reserved seat. It might no longer be reserved or is occupied.', 409, 'RACE');
     } else {
         const randomResult = await Seat.aggregate([
             { $match: { libraryId: library._id, status: 'Available' } },
@@ -436,16 +476,34 @@ exports.checkIn = async (req, res) => {
         if (activeSub) {
             const currentTimeStr = new Date().toLocaleTimeString('en-GB', { hour12: false, timeZone: tz }).substring(0, 5);
 
-            const userReservedSeat = await Seat.findOne({
-                libraryId: library._id,
-                reservations: {
-                    $elemMatch: {
-                        userId,
-                        startTime: { $lte: currentTimeStr },
-                        endTime:   { $gte: currentTimeStr }
+            let userReservedSeat = null;
+
+            // If user has a FIXED_SHIFT sub, match reservation for this shift
+            if (activeSub.accessMode === 'FIXED_SHIFT' && activeSub.shift) {
+                userReservedSeat = await Seat.findOne({
+                    libraryId: library._id,
+                    reservations: {
+                        $elemMatch: {
+                            userId,
+                            startTime: activeSub.shift.startTime,
+                            endTime:   activeSub.shift.endTime
+                        }
                     }
-                }
-            }).session(session);
+                }).session(session);
+            }
+
+            if (!userReservedSeat) {
+                userReservedSeat = await Seat.findOne({
+                    libraryId: library._id,
+                    reservations: {
+                        $elemMatch: {
+                            userId,
+                            startTime: { $lte: currentTimeStr },
+                            endTime:   { $gte: currentTimeStr }
+                        }
+                    }
+                }).session(session);
+            }
 
             let resultData;
             if (userReservedSeat) {

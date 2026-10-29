@@ -4,7 +4,7 @@ import {
   Users, CheckCircle, DollarSign, Activity, Clock, Calendar, Search,
   Filter, ChevronLeft, ChevronRight, X, Download, MoreVertical,
   ArrowUpRight, Plus, FileText, Gift, Edit2, Check,
-  Armchair, CheckCircle2, AlertCircle, Phone, Mail, ArrowRight
+  Armchair, CheckCircle2, AlertCircle, Phone, Mail, ArrowRight, Trash2
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
@@ -153,6 +153,33 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
+
+  // Remove Member State
+  const [userToRemove, setUserToRemove] = useState(null); // { userId, userName }
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const handleRemoveUser = async () => {
+    if (!userToRemove || !libraryId) return;
+    setIsRemoving(true);
+    try {
+      const response = await axiosClient.delete(`/library/${libraryId}/user/${userToRemove.userId}`);
+      toast.success(response.data.message || `${userToRemove.userName} removed from library`);
+
+      // If modal was open for this user, close it
+      if (selectedUser === userToRemove.userId) {
+        setUserAnalytics(null);
+        setSelectedUser(null);
+      }
+
+      setUserToRemove(null);
+      fetchLibraryUsers();
+      fetchLibraryStatistics();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove user from library');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
 
   // Direct Student Creation State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -321,8 +348,8 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
               border="border-emerald-100 dark:border-emerald-500/20"
             />
             <StatCard
-              title="Total Revenue"
-              value={formatCurrency(statistics.financialMetrics?.totalRevenue || 0)}
+              title="This Month's Revenue"
+              value={formatCurrency(statistics.financialMetrics?.currentMonthRevenue ?? statistics.financialMetrics?.totalRevenue ?? 0)}
               icon={<DollarSign className="w-4 h-4 text-purple-500" />}
               bg="bg-purple-50 dark:bg-purple-500/10"
               border="border-purple-100 dark:border-purple-500/20"
@@ -429,6 +456,7 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
                   key={user.userId}
                   user={user}
                   onClick={() => fetchUserAnalytics(user.userId)}
+                  onRemove={(u) => setUserToRemove({ userId: u.userId, userName: u.userName })}
                 />
               ))}
             </div>
@@ -467,6 +495,7 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
             analytics={userAnalytics}
             libraryName={statistics?.library?.name || 'Library'}
             libraryId={libraryId}
+            onRemoveUser={(u) => setUserToRemove(u)}
             onUpdateUser={(updatedUser) => {
               setUserAnalytics((prev) => (prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : null));
               setUsers((prev) =>
@@ -478,6 +507,58 @@ const LibraryUsersManagement = ({ libraryId: propLibraryId }) => {
               setSelectedUser(null);
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* --- REMOVE MEMBER CONFIRMATION MODAL --- */}
+      <AnimatePresence>
+        {userToRemove && (
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-[#111114] border border-gray-200 dark:border-white/10 rounded-3xl shadow-2xl max-w-md w-full p-6 text-gray-900 dark:text-white"
+            >
+              <div className="flex items-center gap-3.5 mb-4 text-rose-500">
+                <div className="p-3 bg-rose-50 dark:bg-rose-500/10 rounded-2xl border border-rose-200 dark:border-rose-500/20">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-gray-900 dark:text-white">
+                    Remove from Library
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Clean disconnected or inactive member
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-6">
+                Are you sure you want to remove <strong className="text-gray-900 dark:text-white font-bold">{userToRemove.userName}</strong> from this library?
+                This will delete their plans in this library, release any occupied or reserved seats, and remove them from your active members list.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  disabled={isRemoving}
+                  onClick={() => setUserToRemove(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-bold transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isRemoving}
+                  onClick={handleRemoveUser}
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 shadow-lg shadow-rose-500/25 flex items-center justify-center gap-1.5"
+                >
+                  {isRemoving ? 'Removing...' : 'Yes, Remove User'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -603,7 +684,7 @@ const StatCard = ({ title, value, icon, bg, border }) => (
 // COMPONENT: MEMBER CARD (Console Primary Element)
 // ============================================
 
-const UserCard = ({ user, onClick }) => {
+const UserCard = ({ user, onClick, onRemove }) => {
   const subscription = user.subscription;
   const isActive = subscription?.status === 'active' && new Date(subscription.expiryDate) > new Date();
 
@@ -676,8 +757,8 @@ const UserCard = ({ user, onClick }) => {
             </div>
           </div>
 
-          {/* Simple presence indicator: ● Present / ● Absent / No recent activity */}
-          <div className="shrink-0">
+          {/* Presence indicator + Remove Action */}
+          <div className="flex items-center gap-1.5 shrink-0">
             {isPresent ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/40 shadow-xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Present
@@ -690,6 +771,19 @@ const UserCard = ({ user, onClick }) => {
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500">
                 No activity
               </span>
+            )}
+            {onRemove && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(user);
+                }}
+                title="Remove user from library"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>
@@ -756,6 +850,7 @@ const MemberProfileModal = ({
   libraryName,
   libraryId,
   onUpdateUser,
+  onRemoveUser,
   onClose
 }) => {
   const [isEditingPhone, setIsEditingPhone] = useState(false);
@@ -914,6 +1009,15 @@ const MemberProfileModal = ({
           >
             <FileText size={14} /> PDF
           </button>
+          {onRemoveUser && (
+            <button
+              onClick={() => onRemoveUser({ userId: user._id, userName: user.name })}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/20 rounded-xl backdrop-blur-md transition-all text-xs font-bold text-rose-600 dark:text-rose-400 shadow-sm"
+              title="Remove user from this library"
+            >
+              <Trash2 size={14} /> Remove Member
+            </button>
+          )}
           <button
             onClick={onClose}
             className="p-1.5 bg-white/80 dark:bg-black/40 hover:bg-white dark:hover:bg-black/70 border border-gray-200 dark:border-white/10 rounded-full backdrop-blur-md transition-all text-gray-500 hover:text-gray-800 dark:hover:text-white"
