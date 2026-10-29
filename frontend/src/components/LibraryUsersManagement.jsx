@@ -21,6 +21,7 @@ import {
 } from '../api/libraryOwnerAnalytics';
 import { createUser } from '../api/users';
 import { jsPDF } from 'jspdf';
+import { formatTime12h, formatTimeRange12h } from '../lib/utils';
 
 // Inject jsPDF into window if utility expects it there
 window.jsPDF = jsPDF;
@@ -43,23 +44,49 @@ const getTodayKey = () => toDateKey(new Date());
 
 const buildAttendanceMap = (allAttendance = []) => {
   const map = new Map();
+  const now = new Date();
 
   allAttendance.forEach((record) => {
     const recordKey = toDateKey(record.date);
 
     const sessions = (record.sessions || []).map((s) => {
       let dur = s.durationMinutes;
-      if (!dur && s.checkInTime) {
-        if (s.checkOutTime) {
-          dur = Math.max(0, Math.round((new Date(s.checkOutTime) - new Date(s.checkInTime)) / 60000));
+      let effectiveCheckOutTime = s.checkOutTime ? new Date(s.checkOutTime) : null;
+      let isOngoing = false;
+      let isAutoCheckout = s.sessionStatus === 'auto_released' || s.checkoutReason === 'auto_expiry' || s.checkoutReason === 'shift_ended' || s.checkoutReason === 'quota_exhausted';
+
+      if (!effectiveCheckOutTime && s.checkInTime) {
+        const inTime = new Date(s.checkInTime);
+        const schedEnd = s.scheduledEnd ? new Date(s.scheduledEnd) : null;
+
+        if (schedEnd && now >= schedEnd) {
+          // Scheduled shift/quota has ended: automatic checkout at scheduledEnd
+          effectiveCheckOutTime = schedEnd;
+          dur = Math.max(0, Math.round((schedEnd - inTime) / 60000));
+          isOngoing = false;
+          isAutoCheckout = true;
+        } else if (!schedEnd && (now - inTime > 8 * 60 * 60 * 1000 || toDateKey(inTime) !== toDateKey(now))) {
+          // Past session with no scheduledEnd that is from a past date or older than 8 hours:
+          // Cap at 5 hours (standard quota)
+          effectiveCheckOutTime = new Date(inTime.getTime() + 5 * 60 * 60 * 1000);
+          dur = 300;
+          isOngoing = false;
+          isAutoCheckout = true;
         } else {
-          dur = Math.max(0, Math.round((new Date() - new Date(s.checkInTime)) / 60000));
+          // Truly active right now
+          dur = Math.max(0, Math.round((now - inTime) / 60000));
+          isOngoing = true;
         }
+      } else if ((!dur || dur === 0) && effectiveCheckOutTime && s.checkInTime) {
+        dur = Math.max(0, Math.round((effectiveCheckOutTime - new Date(s.checkInTime)) / 60000));
       }
+
       return {
         ...s,
+        checkOutTime: effectiveCheckOutTime ? effectiveCheckOutTime.toISOString() : null,
         durationMinutes: dur || 0,
-        isOngoing: !s.checkOutTime
+        isOngoing,
+        isAutoCheckout
       };
     });
 
@@ -691,6 +718,16 @@ const UserCard = ({ user, onClick }) => {
               </span>
             )}
           </div>
+          {subscription?.shift && (
+            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100 dark:border-white/5 text-[11px]">
+              <span className="font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800/40">
+                {subscription.shift.name || subscription.shift.code}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400 font-medium text-[10px]">
+                {formatTimeRange12h(subscription.shift.startTime, subscription.shift.endTime)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1208,11 +1245,12 @@ const MemberProfileModal = ({
                       {selectedDayRecord.sessions && selectedDayRecord.sessions.length > 0 ? (
                         selectedDayRecord.sessions.map((session, idx) => {
                           const checkInStr = session.checkInTime
-                            ? new Date(session.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            ? new Date(session.checkInTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
                             : 'Start';
-                          const checkOutStr = session.checkOutTime
-                            ? new Date(session.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            : 'Active Now';
+                          let checkOutStr = 'Active Now';
+                          if (session.checkOutTime) {
+                            checkOutStr = new Date(session.checkOutTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                          }
 
                           return (
                             <div
@@ -1227,11 +1265,15 @@ const MemberProfileModal = ({
                                   <span className="font-semibold text-gray-800 dark:text-gray-200 block">
                                     {checkInStr} — {checkOutStr}
                                   </span>
-                                  {session.isOngoing && (
+                                  {session.isOngoing ? (
                                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Currently Inside
                                     </span>
-                                  )}
+                                  ) : session.isAutoCheckout ? (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                                      Auto-released when time ended
+                                    </span>
+                                  ) : null}
                                 </div>
                               </div>
                               <span className="font-mono font-bold text-gray-600 dark:text-gray-400 bg-white dark:bg-white/5 px-2 py-1 rounded-md border border-gray-200/50 dark:border-white/5">
@@ -1363,6 +1405,11 @@ const MemberProfileModal = ({
                             <span className="text-xs text-gray-400 mt-0.5 block">
                               {new Date(sub.startDate).toLocaleDateString()} — {new Date(sub.expiryDate).toLocaleDateString()}
                             </span>
+                            {sub.shift && (
+                              <span className="inline-block mt-1 text-[11px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800/40">
+                                {sub.shift.name || sub.shift.code} ({formatTimeRange12h(sub.shift.startTime, sub.shift.endTime)})
+                              </span>
+                            )}
                           </div>
                           <span className="text-sm font-bold text-gray-900 dark:text-white">
                             {formatCurrency(sub.pricePaid || 0)}

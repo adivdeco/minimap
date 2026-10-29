@@ -288,7 +288,7 @@ const AttendanceCalendar = () => {
                                                                 <div>
                                                                     <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Check In</p>
                                                                     <span className="text-slate-900 dark:text-white font-bold">
-                                                                        {new Date(session.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        {new Date(session.checkInTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -309,7 +309,7 @@ const AttendanceCalendar = () => {
                                                                     <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Check Out</p>
                                                                     <span className="text-slate-900 dark:text-white font-bold">
                                                                         {session.checkOutTime
-                                                                            ? new Date(session.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                                            ? new Date(session.checkOutTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
                                                                             : <span className="text-emerald-500 dark:text-emerald-400 flex items-center gap-2">
                                                                                 Active Now
                                                                                 <span className="flex h-2 w-2 relative">

@@ -4,6 +4,7 @@ import { getLibrarySeats, updateSeatStatus, reserveSeat, cancelReservation } fro
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import SeatCanvas from './SeatCanvas';
+import { formatTime12h, formatTimeRange12h } from '../lib/utils';
 
 // --- HELPER: Check if a seat has a reservation overlapping a given time range ---
 const hasReservationInRange = (seat, startTime, endTime) => {
@@ -496,9 +497,9 @@ const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservati
                       >
                         {/* Time Badge */}
                         <div className="shrink-0 text-center">
-                          <div className="text-xs font-mono font-bold text-blue-700">{res.startTime}</div>
+                          <div className="text-xs font-mono font-bold text-blue-700">{formatTime12h(res.startTime)}</div>
                           <div className="text-[9px] text-gray-400">to</div>
-                          <div className="text-xs font-mono font-bold text-blue-700">{res.endTime}</div>
+                          <div className="text-xs font-mono font-bold text-blue-700">{formatTime12h(res.endTime)}</div>
                         </div>
 
                         {/* User Info */}
@@ -528,7 +529,7 @@ const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservati
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Cancel reservation for ${resUser.name || 'this user'} (${res.startTime} – ${res.endTime})?`)) {
+                            if (confirm(`Cancel reservation for ${resUser.name || 'this user'} (${formatTimeRange12h(res.startTime, res.endTime)})?`)) {
                               onCancelReservation(seat._id, index);
                             }
                           }}
@@ -615,7 +616,7 @@ const SeatDetailModal = ({ seat, onClose, onUpdate, onReserve, onCancelReservati
                 {hasReservations && (
                   <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-xs text-amber-800">
                     <strong>Existing slots:</strong>{' '}
-                    {reservations.map(r => `${r.startTime}–${r.endTime}`).join(', ')}
+                    {reservations.map(r => formatTimeRange12h(r.startTime, r.endTime)).join(', ')}
                   </div>
                 )}
 

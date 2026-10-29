@@ -214,10 +214,17 @@ const SmartLibraryScanner = ({ onClose }) => {
         <h1 className="text-3xl font-bold mb-2 text-white">Access Granted!</h1>
         <p className="text-green-200 mb-6 font-medium">Welcome back!</p>
 
-        <div className="bg-white/10 border border-white/10 p-6 rounded-2xl mb-6">
+        <div className="bg-white/10 border border-white/10 p-6 rounded-2xl mb-4">
           <p className="text-xs uppercase tracking-widest font-bold text-green-300 mb-1">Assigned Seat</p>
           <p className="text-5xl font-black text-white tracking-tight">{data?.seat || 'A-1'}</p>
         </div>
+
+        {data?.shiftName && (
+          <div className="bg-white/10 border border-white/15 px-4 py-2 rounded-xl mb-6 flex items-center justify-between text-xs">
+            <span className="text-green-300 font-semibold uppercase tracking-wider text-[10px]">Shift</span>
+            <span className="font-bold text-white">{data.shiftName}</span>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4">

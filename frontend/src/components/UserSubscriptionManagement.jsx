@@ -4,8 +4,46 @@ import { activateSubscriptionOffline, grantGracePeriod, deleteSubscription } fro
 import { getLibraryPlans } from '../api/plan';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
-import { Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X, Gift, Trash2, Download, AlertCircle } from 'lucide-react';
+import {
+    Plus, Search, Calendar, DollarSign, Mail, Phone, Clock, User, X,
+    Gift, Trash2, Download, AlertCircle, Sun, Sunset, Moon, Timer
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatTime12h, formatTimeRange12h } from '../lib/utils';
+
+// ── Shift Preset Suggestions (prefill only; server always validates) ───────────
+const SHIFT_PRESETS = [
+    { label: 'Morning  (6:00 AM – 11:00 AM)', code: 'MOR', name: 'Morning Shift', startTime: '06:00', endTime: '11:00', earlyEntryGraceMinutes: 10, allowLateEntry: false },
+    { label: 'Afternoon (11:00 AM – 4:00 PM)', code: 'AFT', name: 'Afternoon Shift', startTime: '11:00', endTime: '16:00', earlyEntryGraceMinutes: 10, allowLateEntry: false },
+    { label: 'Evening  (4:00 PM – 9:00 PM)',  code: 'EVE', name: 'Evening Shift',   startTime: '16:00', endTime: '21:00', earlyEntryGraceMinutes: 10, allowLateEntry: true },
+    { label: 'Night    (9:00 PM – 6:00 AM)',  code: 'NGT', name: 'Night Shift',     startTime: '21:00', endTime: '06:00', earlyEntryGraceMinutes: 15, allowLateEntry: true },
+    { label: 'Full Day (6:00 AM – 10:00 PM)', code: 'FUL', name: 'Full Day',       startTime: '06:00', endTime: '22:00', earlyEntryGraceMinutes: 15, allowLateEntry: true },
+    { label: 'Custom…', code: '', name: '', startTime: '', endTime: '', earlyEntryGraceMinutes: 10, allowLateEntry: false }
+];
+
+const EMPTY_SHIFT = { code: '', name: '', startTime: '', endTime: '', earlyEntryGraceMinutes: 10, allowLateEntry: false };
+
+const EMPTY_FORM = {
+    planId: '',
+    pricePaid: '',
+    startDate: new Date().toLocaleDateString('en-CA'),
+    endDate: '',
+    paymentMethod: 'cash',
+    accessMode: 'DAILY_QUOTA',
+    dailyQuotaMinutes: '',
+    shift: { ...EMPTY_SHIFT }
+};
+
+// ── Helper: display shift badge ────────────────────────────────────────────────
+const ShiftBadge = ({ shift }) => {
+    if (!shift) return null;
+    return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold uppercase tracking-wider border border-indigo-200 dark:border-indigo-500/30">
+            <Clock size={10} />
+            {shift.name} · {formatTimeRange12h(shift.startTime, shift.endTime)}
+        </span>
+    );
+};
 
 const UserSubscriptionManagement = ({ libraryId }) => {
     const { user: currentUser } = useAuth();
@@ -20,13 +58,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [activatingId, setActivatingId] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
-    const [subscriptionForm, setSubscriptionForm] = useState({
-        planId: '',
-        pricePaid: '',
-        startDate: new Date().toLocaleDateString('en-CA'),
-        endDate: '',
-        paymentMethod: 'cash'
-    });
+    const [subscriptionForm, setSubscriptionForm] = useState({ ...EMPTY_FORM });
 
     // Grace Period Modal State
     const [showGraceModal, setShowGraceModal] = useState(false);
@@ -50,11 +82,12 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                 const start = subscriptionForm.startDate ? new Date(subscriptionForm.startDate) : new Date();
                 const end = new Date(start);
                 end.setDate(end.getDate() + (selectedPlan.durationInDays || 0));
-                
-                setSubscriptionForm(prev => ({ 
-                    ...prev, 
+
+                setSubscriptionForm(prev => ({
+                    ...prev,
                     pricePaid: selectedPlan.price,
-                    endDate: end.toLocaleDateString('en-CA')
+                    endDate: end.toLocaleDateString('en-CA'),
+                    dailyQuotaMinutes: selectedPlan.hoursPerDay ? selectedPlan.hoursPerDay * 60 : prev.dailyQuotaMinutes
                 }));
             }
         }
@@ -87,7 +120,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                 } else {
                     setUsers([]);
                 }
-            } catch (err) {
+            } catch {
                 toast.error("Failed to load users");
                 setUsers([]);
             }
@@ -100,42 +133,98 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         try {
             const response = await getLibraryPlans(libraryId);
             setPlans(response);
-        } catch (error) {
+        } catch {
             toast.error("Failed to load plans");
         }
     };
 
     const openActivationModal = (user) => {
         setSelectedUser(user);
-        setSubscriptionForm({
-            planId: '',
-            pricePaid: '',
-            startDate: new Date().toLocaleDateString('en-CA'),
-            endDate: '',
-            paymentMethod: 'cash'
-        });
+        setSubscriptionForm({ ...EMPTY_FORM });
         setShowModal(true);
     };
 
+    // ── Form field helpers ──────────────────────────────────────────────────────
     const handleFormChange = (e) => {
-        const { name, value } = e.target;
-        setSubscriptionForm(prev => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        setSubscriptionForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    };
+
+    const handleShiftChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setSubscriptionForm(prev => ({
+            ...prev,
+            shift: { ...prev.shift, [name]: type === 'checkbox' ? checked : value }
+        }));
+    };
+
+    const handlePresetSelect = (e) => {
+        const preset = SHIFT_PRESETS.find(p => p.code === e.target.value) || SHIFT_PRESETS[SHIFT_PRESETS.length - 1];
+        setSubscriptionForm(prev => ({
+            ...prev,
+            shift: {
+                code:                   preset.code,
+                name:                   preset.name,
+                startTime:              preset.startTime,
+                endTime:                preset.endTime,
+                earlyEntryGraceMinutes: preset.earlyEntryGraceMinutes,
+                allowLateEntry:         preset.allowLateEntry
+            }
+        }));
+    };
+
+    // ── Validation ──────────────────────────────────────────────────────────────
+    const validateForm = () => {
+        if (!subscriptionForm.planId) { toast.error("Please select a plan"); return false; }
+        if (subscriptionForm.pricePaid === '' && subscriptionForm.pricePaid !== 0) { toast.error("Please enter price paid"); return false; }
+
+        if (subscriptionForm.accessMode === 'FIXED_SHIFT') {
+            const { code, name, startTime, endTime } = subscriptionForm.shift;
+            if (!code || !name || !startTime || !endTime) {
+                toast.error("Fixed Shift requires code, name, start time, and end time.");
+                return false;
+            }
+            const timeRe = /^([01]\d|2[0-3]):([0-5]\d)$/;
+            if (!timeRe.test(startTime) || !timeRe.test(endTime)) {
+                toast.error("Shift times must be in HH:mm (24-hour) format.");
+                return false;
+            }
+        }
+        return true;
     };
 
     const handleActivateSubscription = async (e) => {
         e.preventDefault();
-        if (!subscriptionForm.planId) return toast.error("Please select a plan");
-        if (!subscriptionForm.pricePaid && subscriptionForm.pricePaid !== 0) return toast.error("Please enter price paid");
+        if (!validateForm()) return;
 
         try {
             setActivatingId(selectedUser._id);
+
+            const shiftPayload = subscriptionForm.accessMode === 'FIXED_SHIFT'
+                ? {
+                    code:                   subscriptionForm.shift.code.toUpperCase(),
+                    name:                   subscriptionForm.shift.name,
+                    startTime:              subscriptionForm.shift.startTime,
+                    endTime:                subscriptionForm.shift.endTime,
+                    earlyEntryGraceMinutes: Number(subscriptionForm.shift.earlyEntryGraceMinutes) || 10,
+                    allowLateEntry:         !!subscriptionForm.shift.allowLateEntry
+                }
+                : null;
+
+            const dailyQuota = subscriptionForm.accessMode === 'DAILY_QUOTA' && subscriptionForm.dailyQuotaMinutes
+                ? Number(subscriptionForm.dailyQuotaMinutes)
+                : null;
+
             const response = await activateSubscriptionOffline(
                 selectedUser._id,
                 libraryId,
                 subscriptionForm.planId,
                 parseFloat(subscriptionForm.pricePaid),
                 subscriptionForm.startDate,
-                subscriptionForm.endDate
+                subscriptionForm.endDate,
+                subscriptionForm.accessMode,
+                shiftPayload,
+                dailyQuota
             );
 
             if (response.success) {
@@ -186,14 +275,11 @@ const UserSubscriptionManagement = ({ libraryId }) => {
     };
 
     const handleDeleteSubscription = async (userId, subscriptionId, userName) => {
-        if (!window.confirm(`Are you sure you want to cancel ${userName}'s active subscription? This action cannot be undone.`)) {
-            return;
-        }
+        if (!window.confirm(`Are you sure you want to cancel ${userName}'s active subscription? This action cannot be undone.`)) return;
 
         try {
             setDeletingId(userId);
             const response = await deleteSubscription(libraryId, subscriptionId);
-            
             if (response.success) {
                 toast.success(response.msg || "Subscription canceled successfully");
                 fetchLibraryUsers();
@@ -216,16 +302,21 @@ const UserSubscriptionManagement = ({ libraryId }) => {
     const handleExportCSV = () => {
         if (filteredUsers.length === 0) return toast.error("No data to export");
 
-        const headers = ["Name", "Email", "Phone", "Plan", "Status", "Expiry Date", "Price Paid"];
-        const rows = filteredUsers.map(user => [
-            user.name,
-            user.email,
-            user.phone || 'N/A',
-            user.studentDetails?.currentSubscription?.planName || 'N/A',
-            user.studentDetails?.currentSubscription?.status || 'No Plan',
-            user.studentDetails?.currentSubscription?.expiryDate ? new Date(user.studentDetails.currentSubscription.expiryDate).toLocaleDateString() : 'N/A',
-            user.studentDetails?.currentSubscription?.pricePaid || 0
-        ]);
+        const headers = ["Name", "Email", "Phone", "Plan", "Access Mode", "Shift", "Status", "Expiry Date", "Price Paid"];
+        const rows = filteredUsers.map(user => {
+            const sub = user.studentDetails?.currentSubscription;
+            return [
+                user.name,
+                user.email,
+                user.phone || 'N/A',
+                sub?.planName || 'N/A',
+                sub?.accessMode || 'N/A',
+                sub?.shift ? `${sub.shift.name} (${formatTimeRange12h(sub.shift.startTime, sub.shift.endTime)})` : 'N/A',
+                sub?.status || 'No Plan',
+                sub?.expiryDate ? new Date(sub.expiryDate).toLocaleDateString() : 'N/A',
+                sub?.pricePaid || 0
+            ];
+        });
 
         const csvContent = [
             headers.join(","),
@@ -252,6 +343,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
         );
     }
 
+    // ── Render ──────────────────────────────────────────────────────────────────
     return (
         <div className="w-full">
             {/* Header */}
@@ -265,7 +357,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-fit">
-                    <button 
+                    <button
                         onClick={handleExportCSV}
                         className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all text-sm font-bold shadow-sm"
                         title="Export filtered list to CSV"
@@ -305,7 +397,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                 <tr>
                                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Member</th>
                                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contact</th>
-                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status / Shift</th>
                                     <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
                                 </tr>
                             </thead>
@@ -321,11 +413,8 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                     if (!isActive && subscription?.gracePeriodAllowed) {
                                         const graceStart = new Date(subscription.graceStartDate || new Date());
                                         graceEndDate = new Date(graceStart.getTime() + (subscription.graceDaysAllowed || 0) * 24 * 60 * 60 * 1000);
-                                        if (new Date() <= graceEndDate) {
-                                            isInGracePeriod = true;
-                                        } else {
-                                            isGracePeriodExpired = true;
-                                        }
+                                        if (new Date() <= graceEndDate) isInGracePeriod = true;
+                                        else isGracePeriodExpired = true;
                                     }
 
                                     const daysUntilExpiry = isActive ? Math.ceil((new Date(subscription.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)) : null;
@@ -344,12 +433,18 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 {isActive ? (
-                                                    <div className="flex flex-col gap-1">
+                                                    <div className="flex flex-col gap-1.5">
                                                         <span className={`px-2.5 py-1 ${isExpiringSoon ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/30' : 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/20'} text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1.5 w-fit border`}>
-                                                            {isExpiringSoon ? <AlertCircle size={12} /> : <Clock size={12} />} 
+                                                            {isExpiringSoon ? <AlertCircle size={12} /> : <Clock size={12} />}
                                                             {isExpiringSoon ? 'Expiring Soon' : 'Active'}
                                                         </span>
                                                         <span className={`text-[11px] ${isExpiringSoon ? 'text-orange-600 dark:text-orange-400 font-bold' : 'text-gray-500'}`}>Exp: {new Date(subscription.expiryDate).toLocaleDateString()}</span>
+                                                        {subscription?.shift && <ShiftBadge shift={subscription.shift} />}
+                                                        {subscription?.accessMode === 'DAILY_QUOTA' && subscription?.dailyQuotaMinutes && (
+                                                            <span className="text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-1 font-medium">
+                                                                <Timer size={10} /> {Math.floor(subscription.dailyQuotaMinutes / 60)}h quota/day
+                                                            </span>
+                                                        )}
                                                         {subscription?.graceDaysUsed > 0 && (
                                                             <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1">
                                                                 <Gift size={10} /> Used {subscription.graceDaysUsed} Grace Days
@@ -401,7 +496,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                                 ) : (
                                                     <div className="flex items-center justify-end gap-3 mr-4">
                                                         <span className="text-sm font-medium text-gray-400 dark:text-gray-500">Up to date</span>
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleDeleteSubscription(user._id, subscription.subscriptionId, user.name)}
                                                             disabled={deletingId === user._id}
                                                             title="Cancel Subscription"
@@ -421,15 +516,15 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                 )}
             </div>
 
-            {/* Modal */}
+            {/* ── Activation Modal ─────────────────────────────────────────────── */}
             <AnimatePresence>
                 {showModal && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white dark:bg-[#18181b] rounded-3xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-white/10 overflow-hidden"
+                            className="bg-white dark:bg-[#18181b] rounded-3xl shadow-2xl max-w-lg w-full border border-gray-200 dark:border-white/10 overflow-hidden my-4"
                         >
                             <div className="bg-gray-50 dark:bg-white/5 p-6 border-b border-gray-100 dark:border-white/5 relative">
                                 <button onClick={() => setShowModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
@@ -440,6 +535,7 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                             </div>
 
                             <form onSubmit={handleActivateSubscription} className="p-6 space-y-5">
+                                {/* Plan Selection */}
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Select Plan *</label>
                                     <select
@@ -458,6 +554,173 @@ const UserSubscriptionManagement = ({ libraryId }) => {
                                     </select>
                                 </div>
 
+                                {/* Access Mode */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Access Mode *</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {[
+                                            { value: 'DAILY_QUOTA', label: 'Daily Quota', desc: 'Time budget per day', icon: <Timer size={16} /> },
+                                            { value: 'FIXED_SHIFT', label: 'Fixed Shift', desc: 'Specific time window', icon: <Clock size={16} /> }
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => setSubscriptionForm(prev => ({ ...prev, accessMode: opt.value }))}
+                                                className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all text-left ${subscriptionForm.accessMode === opt.value
+                                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                                                    : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/20'
+                                                }`}
+                                            >
+                                                {opt.icon}
+                                                <div>
+                                                    <div>{opt.label}</div>
+                                                    <div className="text-[10px] font-normal opacity-70">{opt.desc}</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Daily Quota (shown for DAILY_QUOTA) */}
+                                {subscriptionForm.accessMode === 'DAILY_QUOTA' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Daily Quota (minutes)</label>
+                                        <div className="relative">
+                                            <Timer className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="number"
+                                                name="dailyQuotaMinutes"
+                                                value={subscriptionForm.dailyQuotaMinutes}
+                                                onChange={handleFormChange}
+                                                placeholder="e.g. 300 (= 5 hours)"
+                                                min="1"
+                                                className="w-full pl-9 pr-4 py-3 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <p className="text-[11px] text-gray-400 mt-1">Leave blank to use plan's hoursPerDay setting.</p>
+                                    </div>
+                                )}
+
+                                {/* Fixed Shift Configuration */}
+                                {subscriptionForm.accessMode === 'FIXED_SHIFT' && (
+                                    <div className="space-y-4 p-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
+                                        <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-bold text-sm">
+                                            <Clock size={16} /> Shift Configuration
+                                        </div>
+
+                                        {/* Preset Picker */}
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Quick Preset</label>
+                                            <select
+                                                onChange={handlePresetSelect}
+                                                className="w-full px-3 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white appearance-none"
+                                            >
+                                                <option value="">-- Choose a preset or fill manually --</option>
+                                                {SHIFT_PRESETS.map(p => (
+                                                    <option key={p.code || 'custom'} value={p.code}>{p.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Shift Code *</label>
+                                                <input
+                                                    type="text"
+                                                    name="code"
+                                                    value={subscriptionForm.shift.code}
+                                                    onChange={handleShiftChange}
+                                                    placeholder="EVE"
+                                                    maxLength={10}
+                                                    className="w-full px-3 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl text-sm uppercase"
+                                                    required={subscriptionForm.accessMode === 'FIXED_SHIFT'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Shift Name *</label>
+                                                <input
+                                                    type="text"
+                                                    name="name"
+                                                    value={subscriptionForm.shift.name}
+                                                    onChange={handleShiftChange}
+                                                    placeholder="Evening Shift"
+                                                    className="w-full px-3 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl text-sm"
+                                                    required={subscriptionForm.accessMode === 'FIXED_SHIFT'}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                                                    Start Time * {subscriptionForm.shift.startTime && (
+                                                        <span className="text-purple-600 dark:text-purple-400 font-bold ml-1">
+                                                            ({formatTime12h(subscriptionForm.shift.startTime)})
+                                                        </span>
+                                                    )}
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    name="startTime"
+                                                    value={subscriptionForm.shift.startTime}
+                                                    onChange={handleShiftChange}
+                                                    className="w-full px-3 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl text-sm"
+                                                    required={subscriptionForm.accessMode === 'FIXED_SHIFT'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                                                    End Time * {subscriptionForm.shift.endTime && (
+                                                        <span className="text-purple-600 dark:text-purple-400 font-bold ml-1">
+                                                            ({formatTime12h(subscriptionForm.shift.endTime)})
+                                                        </span>
+                                                    )}
+                                                </label>
+                                                <input
+                                                    type="time"
+                                                    name="endTime"
+                                                    value={subscriptionForm.shift.endTime}
+                                                    onChange={handleShiftChange}
+                                                    className="w-full px-3 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl text-sm"
+                                                    required={subscriptionForm.accessMode === 'FIXED_SHIFT'}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Early Entry Grace (min)</label>
+                                                <input
+                                                    type="number"
+                                                    name="earlyEntryGraceMinutes"
+                                                    value={subscriptionForm.shift.earlyEntryGraceMinutes}
+                                                    onChange={handleShiftChange}
+                                                    min="0"
+                                                    className="w-full px-3 py-2.5 bg-white dark:bg-[#0F0F12] border border-gray-200 dark:border-white/10 rounded-xl text-sm"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col justify-end pb-1">
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        name="allowLateEntry"
+                                                        checked={!!subscriptionForm.shift.allowLateEntry}
+                                                        onChange={handleShiftChange}
+                                                        className="w-4 h-4 rounded accent-indigo-600"
+                                                    />
+                                                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Allow Late Entry</span>
+                                                </label>
+                                                <p className="text-[10px] text-gray-400 mt-1">Student may enter after shift starts</p>
+                                            </div>
+                                        </div>
+
+                                        <p className="text-[11px] text-indigo-600 dark:text-indigo-400">
+                                            Student will be admitted from <strong>{subscriptionForm.shift.startTime ? `${formatTime12h(subscriptionForm.shift.startTime)} (minus ${subscriptionForm.shift.earlyEntryGraceMinutes}m grace)` : '—'}</strong> until <strong>{subscriptionForm.shift.endTime ? formatTime12h(subscriptionForm.shift.endTime) : '—'}</strong>. Scheduled exit = shift end time.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Price & Dates */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">Price Paid *</label>

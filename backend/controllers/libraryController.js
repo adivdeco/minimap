@@ -912,9 +912,10 @@ const getLibraryUsers = async (req, res) => {
             date: { $gte: startOfToday, $lt: endOfToday }
         });
 
+        const now = new Date();
         const todayAttendanceMap = new Map();
         todayRecords.forEach(record => {
-            const hasOngoing = record.sessions && record.sessions.some(s => !s.checkOutTime);
+            const hasOngoing = record.sessions && record.sessions.some(s => !s.checkOutTime && (!s.scheduledEnd || new Date(s.scheduledEnd) > now));
             todayAttendanceMap.set(record.userId.toString(), {
                 attendedToday: (record.sessionCount > 0 || (record.sessions && record.sessions.length > 0)),
                 isCurrentlyInside: hasOngoing,
@@ -986,7 +987,11 @@ const getLibraryUsers = async (req, res) => {
                         gracePeriodAllowed: sub.gracePeriodAllowed,
                         graceDaysAllowed: sub.graceDaysAllowed,
                         graceDaysUsed: sub.graceDaysUsed,
-                        graceStartDate: sub.graceStartDate
+                        graceStartDate: sub.graceStartDate,
+                        // Shift fields
+                        accessMode: sub.accessMode || 'DAILY_QUOTA',
+                        shift: sub.shift || null,
+                        dailyQuotaMinutes: sub.dailyQuotaMinutes || null
                     },
                     attendance: {
                         totalSessions: attendance.totalSessions || 0,
@@ -1102,8 +1107,13 @@ const getUserAnalytics = async (req, res) => {
             currentSubscription = subscriptions[0]; // fallback to the most recent one
         }
 
-        // Fetch all attendance records for this user
+        // Fetch all attendance records for this user (closing any expired sessions first)
         const Attendance = require('../models/Attendance');
+        const { closeExpiredAttendanceSessions } = require('./entryController');
+        if (typeof closeExpiredAttendanceSessions === 'function') {
+            await closeExpiredAttendanceSessions();
+        }
+
         const attendanceRecords = await Attendance.find({
             userId,
             libraryId
@@ -1127,7 +1137,9 @@ const getUserAnalytics = async (req, res) => {
                         seatNumber: session.seatNumber,
                         checkInTime: session.checkInTime,
                         checkOutTime: session.checkOutTime,
-                        durationMinutes: session.durationMinutes
+                        durationMinutes: session.durationMinutes,
+                        sessionStatus: session.sessionStatus,
+                        checkoutReason: session.checkoutReason
                     });
                 }
             });
@@ -1151,8 +1163,11 @@ const getUserAnalytics = async (req, res) => {
             return rd >= startOfToday && rd < endOfToday;
         });
 
+        const now = new Date();
         const isPresentToday = todayRecord ? (todayRecord.sessionCount > 0 || (todayRecord.sessions && todayRecord.sessions.length > 0)) : false;
-        const isCurrentlyInside = todayRecord ? (todayRecord.sessions && todayRecord.sessions.some(s => !s.checkOutTime)) : false;
+        const isCurrentlyInside = todayRecord
+            ? (todayRecord.sessions && todayRecord.sessions.some(s => !s.checkOutTime && (!s.scheduledEnd || new Date(s.scheduledEnd) > now)))
+            : false;
         const presenceStatus = isPresentToday ? 'Present' : (attendanceRecords.length > 0 ? 'Absent' : 'No recent activity');
 
         // Format subscription history
@@ -1378,22 +1393,6 @@ const getLibraryStatistics = async (req, res) => {
     }
 };
 
-    addLibrary,
-    updateLibrary,
-    getAllLibraries,
-    getLibraryById,
-    getMyLibraries,
-    getNearbyLibraries,
-    deleteLibrary,
-    toggleLibraryStatus,
-    rateLibrary,
-    deleteReview,
-    regenerateQRCode,
-    generateSeatsForLibrary,
-    getLibraryUsers,
-    getUserAnalytics,
-    getLibraryStatistics
-
 // @desc    Update user contact info in a library
 // @route   PUT /api/library/:libraryId/user/:userId/contact
 const updateUserContactInfo = async (req, res) => {
@@ -1526,94 +1525,126 @@ const getLibraryAttendanceChart = async (req, res) => {
 
 // @desc    Get shift attendance analytics for a specific day
 // @route   GET /api/library/:libraryId/attendance-shifts
+// Uses persisted session.shiftCode / session.shiftName — does NOT infer from check-in hour.
 const getLibraryShiftAnalytics = async (req, res) => {
     try {
         const userId = req.user._id;
-        const role = req.user.role;
+        const role   = req.user.role;
         const { libraryId } = req.params;
         const { date } = req.query; // YYYY-MM-DD format
 
-        // Basic validation
         if (!date) {
-            return res.status(400).json({ message: "Date query parameter is required (YYYY-MM-DD)" });
+            return res.status(400).json({ message: 'Date query parameter is required (YYYY-MM-DD)' });
         }
 
         const library = await Library.findById(libraryId);
-        if (!library) {
-            return res.status(404).json({ message: "Library not found" });
-        }
+        if (!library) return res.status(404).json({ message: 'Library not found' });
 
         const isOwner = library.ownerId.toString() === userId.toString();
         if (role !== 'admin' && role !== 'co-admin' && !isOwner) {
-            return res.status(403).json({
-                message: "Forbidden: You do not have access to library statistics"
-            });
+            return res.status(403).json({ message: 'Forbidden: You do not have access to library statistics' });
         }
 
-        // Because production servers map dates differently via timezone logic, we widen the 
-        // boundary to safely cover any UTC drifts (+/- 24 hours), then strictly filter in memory.
-        const [yStr, mStr, dStr] = date.split('-');
-        const baseDate = new Date(Date.UTC(parseInt(yStr), parseInt(mStr) - 1, parseInt(dStr)));
-        
-        const targetStartDate = new Date(baseDate.getTime() - (24 * 60 * 60 * 1000));
-        const targetEndDate = new Date(baseDate.getTime() + (48 * 60 * 60 * 1000));
+        const tz = library.timezone || 'Asia/Kolkata';
 
-        // Fetch attendance records for this library surrounding this date bucket
+        // Service-date bucket: midnight UTC representing YYYY-MM-DD in library timezone
+        const [yStr, mStr, dStr] = date.split('-').map(Number);
+        const serviceDate = new Date(Date.UTC(yStr, mStr - 1, dStr));
+
+        // Fetch all attendance records whose service-date bucket matches
         const attendanceRecords = await Attendance.find({
             libraryId,
-            date: { $gte: targetStartDate, $lte: targetEndDate }
-        });
+            date: serviceDate
+        }).lean();
 
-        const shiftCounts = {
-            Morning: 0,   
-            Afternoon: 0, 
-            Evening: 0,   
-            Night: 0      
+        // ── Build shift-keyed metrics ──────────────────────────────────────────
+        // shiftMap: { [shiftKey]: { shiftCode, shiftName, assigned: Set<userId>,
+        //                            attended: Set<userId>, currentlyInside: Set<userId>,
+        //                            pendingCheckout: Set<userId>, totalVisits, studyMinutes } }
+        const shiftMap = new Map();
+
+        const UNASSIGNED_KEY = '__DAILY_QUOTA__';
+
+        const getOrCreate = (key, code, name) => {
+            if (!shiftMap.has(key)) {
+                shiftMap.set(key, {
+                    shiftCode:       code,
+                    shiftName:       name,
+                    assignedUsers:   new Set(),
+                    attendedUsers:   new Set(),
+                    currentlyInside: new Set(),
+                    pendingCheckout: new Set(),
+                    totalVisits:     0,
+                    studyMinutes:    0
+                });
+            }
+            return shiftMap.get(key);
         };
 
-        // Categorize sessions explicitly extracting India Local Time
         attendanceRecords.forEach(record => {
-            if (record.sessions && record.sessions.length > 0) {
-                const firstSession = record.sessions.find(session => session.checkInTime);
-                if (firstSession) {
-                    const checkInDate = new Date(firstSession.checkInTime);
-                    
-                    const sessionLocalStr = checkInDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-                    const hour = checkInDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric' });
-                    const currentHour = parseInt(hour);
+            const userIdStr = record.userId.toString();
+            (record.sessions || []).forEach(sess => {
+                const key  = sess.shiftCode || UNASSIGNED_KEY;
+                const code = sess.shiftCode || null;
+                const name = sess.shiftName || (sess.accessMode === 'DAILY_QUOTA' ? 'Daily Quota' : 'Unassigned');
+                const bucket = getOrCreate(key, code, name);
 
-                    if (sessionLocalStr === date) {
-                        if (currentHour >= 6 && currentHour < 11) shiftCounts.Morning++;
-                        else if (currentHour >= 11 && currentHour < 16) shiftCounts.Afternoon++;
-                        else if (currentHour >= 16 && currentHour < 21) shiftCounts.Evening++;
-                        else shiftCounts.Night++;
+                bucket.assignedUsers.add(userIdStr);
+
+                if (sess.checkInTime) {
+                    bucket.attendedUsers.add(userIdStr);
+                    bucket.totalVisits++;
+                }
+
+                if (sess.sessionStatus === 'open') {
+                    bucket.currentlyInside.add(userIdStr);
+                    // Expired window but not yet checked out
+                    if (sess.scheduledEnd && new Date(sess.scheduledEnd) < new Date()) {
+                        bucket.pendingCheckout.add(userIdStr);
                     }
                 }
-            }
+
+                if (sess.durationMinutes) {
+                    bucket.studyMinutes += sess.durationMinutes;
+                }
+            });
         });
 
-        // Format for recharts
-        const chartData = [
-            { shift: "Morning (6 AM - 11 AM)", visitors: shiftCounts.Morning },
-            { shift: "(11-4PM)", visitors: shiftCounts.Afternoon },
-            { shift: "Evening (4 PM - 9 PM)", visitors: shiftCounts.Evening },
-            { shift: "(9-6AM)", visitors: shiftCounts.Night }
-        ];
+        // ── Serialise and compute totals ─────────────────────────────────────
+        const shifts = [];
+        shiftMap.forEach((v, k) => {
+            shifts.push({
+                shiftCode:              v.shiftCode,
+                shiftName:              v.shiftName,
+                assignedCount:          v.assignedUsers.size,
+                uniqueAttendedCount:    v.attendedUsers.size,
+                totalVisits:            v.totalVisits,
+                currentlyInsideCount:   v.currentlyInside.size,
+                pendingCheckoutCount:   v.pendingCheckout.size,
+                studyMinutes:           v.studyMinutes
+            });
+        });
+
+        // Legacy chartData format (recharts bar chart) — preserved for backward compat
+        const chartData = shifts.map(s => ({
+            shift:    s.shiftName,
+            visitors: s.uniqueAttendedCount
+        }));
+
+        const totalVisitors = shifts.reduce((a, s) => a + s.uniqueAttendedCount, 0);
 
         res.status(200).json({
             success: true,
-            message: "Shift analytics retrieved successfully",
-            chartData,
-            totalVisitors: shiftCounts.Morning + shiftCounts.Afternoon + shiftCounts.Evening + shiftCounts.Night
+            message: 'Shift analytics retrieved successfully',
+            date,
+            shifts,     // new detailed metrics
+            chartData,  // preserved for existing chart consumers
+            totalVisitors
         });
 
     } catch (error) {
         console.error('Error fetching shift analytics:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
     }
 };
 
@@ -1684,7 +1715,17 @@ const getLibraryAttendanceDayDetails = async (req, res) => {
                             ? new Date(session.checkOutTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) 
                             : 'On Seat Now';
                         const seatNumber = session.seatNumber || 'N/A';
-                        sessionDetails.push({ inTime, outTime, seatNumber });
+                        sessionDetails.push({
+                            inTime,
+                            outTime,
+                            seatNumber,
+                            shiftCode: session.shiftCode || null,
+                            shiftName: session.shiftName || null,
+                            sessionStatus: session.sessionStatus || (session.checkOutTime ? 'closed' : 'open'),
+                            checkoutReason: session.checkoutReason || null,
+                            scheduledStart: session.scheduledStart || null,
+                            scheduledEnd: session.scheduledEnd || null
+                        });
                     }
                 });
             }
@@ -1696,6 +1737,8 @@ const getLibraryAttendanceDayDetails = async (req, res) => {
                 avatar: record.userId.avatar || '',
                 phone: record.userId.phone || 'N/A',
                 planName: sub ? (sub.planName || 'Active Plan') : 'No Active Plan',
+                accessMode: sub ? (sub.accessMode || 'DAILY_QUOTA') : null,
+                shift: sub?.shift || null,
                 totalSessions: record.sessionCount,
                 totalMinutes: record.totalDurationToday || 0,
                 sessions: sessionDetails

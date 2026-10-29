@@ -125,10 +125,11 @@ const librarySchema = new Schema({
         // which updates the version and invalidates the old printed code.
         qrVersion: { type: Number, default: 1 },
 
-        // Optional: Geo-fencing radius (in meters) allowed for scanning
         allowedRadius: { type: Number, default: 50 },
-
     },
+
+
+    timezone: { type: String, default: 'Asia/Kolkata' },
 
     isActive: { type: Boolean, default: true },
     isVerified: { type: Boolean, default: false },

@@ -27,15 +27,40 @@ export const getAttendanceHistory = async () => {
     return response.data;
 };
 
-// Activate Subscription Offline (Admin/Owner only)
-export const activateSubscriptionOffline = async (userId, libraryId, planId, pricePaid = 0, startDate = null, endDate = null) => {
+/**
+ * Activate Subscription Offline (Admin/Owner only).
+ *
+ * @param {string}  userId
+ * @param {string}  libraryId
+ * @param {string}  planId
+ * @param {number}  pricePaid
+ * @param {string}  startDate   – ISO date string or null
+ * @param {string}  endDate     – ISO date string or null
+ * @param {string}  accessMode  – 'FIXED_SHIFT' | 'DAILY_QUOTA'
+ * @param {Object|null} shift   – { code, name, startTime, endTime, earlyEntryGraceMinutes, allowLateEntry }
+ * @param {number|null} dailyQuotaMinutes
+ */
+export const activateSubscriptionOffline = async (
+    userId,
+    libraryId,
+    planId,
+    pricePaid = 0,
+    startDate = null,
+    endDate = null,
+    accessMode = 'DAILY_QUOTA',
+    shift = null,
+    dailyQuotaMinutes = null
+) => {
     const response = await api.post('/entry/activate-subscription-offline', {
         userId,
         libraryId,
         planId,
         pricePaid,
         startDate,
-        endDate
+        endDate,
+        accessMode,
+        shift,
+        dailyQuotaMinutes
     });
     return response.data;
 };
@@ -53,4 +78,3 @@ export const deleteSubscription = async (libraryId, subscriptionId) => {
     const response = await api.delete(`/entry/subscription/${libraryId}/${subscriptionId}`);
     return response.data;
 };
-

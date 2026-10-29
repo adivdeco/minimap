@@ -110,6 +110,9 @@ const initScheduler = () => {
         }
     });
 
+    // Run immediately on startup to clear any sessions/seats that expired while server was offline
+    releaseExpiredSeats().catch(err => console.error("[Scheduler] Initial seat release error:", err));
+
     console.log("Scheduler initialized. Jobs are running.");
 };
 

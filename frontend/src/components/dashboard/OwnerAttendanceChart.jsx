@@ -325,6 +325,14 @@ export function OwnerAttendanceChart({ libraryId }) {
                                 </span>
                               </>
                             )}
+                            {session.shiftName && (
+                              <>
+                                <span className="border-l border-slate-300 dark:border-slate-700 h-3 mx-1"></span>
+                                <span className="text-purple-600 dark:text-purple-400 font-semibold">
+                                  {session.shiftName}
+                                </span>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -337,6 +345,11 @@ export function OwnerAttendanceChart({ libraryId }) {
                     <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold text-center mt-2 shadow-sm border whitespace-nowrap ${u.planName.toLowerCase().includes('active') || u.planName !== 'No Active Plan' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50' : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
                       {u.planName}
                     </span>
+                    {u.shift && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-purple-50 text-purple-600 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800/50 mt-1 whitespace-nowrap">
+                        {u.shift.name || u.shift.code}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))
